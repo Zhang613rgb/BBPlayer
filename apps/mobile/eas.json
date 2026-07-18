@@ -25,7 +25,8 @@
 			"channel": "production",
 			"env": {
 				"APP_VARIANT": "production",
-				"ABI_FILTERS": "arm64-v8a"
+				"ABI_FILTERS": "arm64-v8a",
+				"VERSION_CODE": "1046"
 			}
 		},
 		"prod-ci": {
@@ -36,7 +37,8 @@
 			},
 			"channel": "production",
 			"env": {
-				"APP_VARIANT": "production"
+				"APP_VARIANT": "production",
+				"VERSION_CODE": "1046"
 			}
 		},
 		"prod-universal": {
@@ -48,7 +50,8 @@
 			"channel": "production",
 			"env": {
 				"APP_VARIANT": "production",
-				"ABI_FILTERS": "armeabi-v7a,arm64-v8a,x86,x86_64"
+				"ABI_FILTERS": "armeabi-v7a,arm64-v8a,x86,x86_64",
+				"VERSION_CODE": "1046"
 			}
 		},
 		"preview": {
