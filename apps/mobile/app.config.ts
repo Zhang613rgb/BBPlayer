@@ -276,11 +276,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 		},
 		extra: {
 			eas: {
-				projectId: '1cbd8d50-e322-4ead-98b6-4ee8b6f2a707',
+				projectId: 'd6d41e59-2eef-4c24-8d54-fbabc58f1739',
 			},
 			updateManifestUrl: 'https://be.bbplayer.roitium.com/update.json',
 		},
-		owner: 'roitium',
+		owner: 'anyhow8601s-team',
 		updates: {
 			url: 'https://u.expo.dev/1cbd8d50-e322-4ead-98b6-4ee8b6f2a707',
 			enableBsdiffPatchSupport: true,
