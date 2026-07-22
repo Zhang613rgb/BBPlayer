@@ -137,15 +137,18 @@ jobs:
           mkdir -p apps/mobile/assets/config/google-services
           echo "$FIREBASE_ANDROID_JSON_B64" | base64 -d > apps/mobile/assets/config/google-services/google-services.real.json
 
-      - name: 🏗 Prebuild (Expo -> Android)
-        run: cd apps/mobile && npx expo prebuild --platform android
+      - name: 🚀 Build Standalone APK
+        run: |
+          cd apps/mobile
+          npx expo run:android --no-install --variant debug 2>&1
+          find android/app/build/outputs/apk -name "*.apk" -exec cp {} "$ARTIFACT_DIR/" \;
 
-      - name: 🚀 Build APK (Dev - direct Gradle)
-        if: env.BUILD_TYPE == 'dev'
+      - name: 🚀 Build Release APK
+        if: env.BUILD_TYPE != 'dev' && env.BUILD_TYPE != 'blank-test'
         run: |
           cd apps/mobile/android
-          ./gradlew assembleDebug
-          cp app/build/outputs/apk/debug/app-debug.apk "$APK_TEMP_PATH"
+          ./gradlew assembleRelease
+          find app/build/outputs/apk/release -name "*.apk" -exec cp {} "$ARTIFACT_DIR/" \;
 
       - name: 🧪 Create Dummy APK
         if: env.BUILD_TYPE == 'blank-test'
