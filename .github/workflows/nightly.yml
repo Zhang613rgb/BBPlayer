@@ -97,7 +97,7 @@ jobs:
       group: nightly-build
       cancel-in-progress: true
     if: needs.check-trigger.outputs.should_build == 'true'
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
