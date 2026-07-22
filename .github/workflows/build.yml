@@ -149,7 +149,7 @@ jobs:
           find app/build/outputs/apk -name "*.apk" -exec cp {} "$ARTIFACT_DIR/" \;
 
       - name: 🚀 Build Release APK
-        if: env.BUILD_TYPE != 'dev' && env.BUILD_TYPE != 'blank-test'
+        if: env.BUILD_TYPE == 'prod'
         run: |
           cd apps/mobile/android
           ./gradlew assembleRelease 2>&1
