@@ -2,7 +2,7 @@ import { useImage } from 'expo-image'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useMemo, useState } from 'react'
 import { RefreshControl, StyleSheet, View } from 'react-native'
-import { Appbar, Text, useTheme } from 'react-native-paper'
+import { Appbar, useTheme } from 'react-native-paper'
 import { Searchbar as SearchBar } from 'react-native-paper'
 import Animated, {
 	useAnimatedStyle,
@@ -10,7 +10,6 @@ import Animated, {
 	withTiming,
 } from 'react-native-reanimated'
 
-import Button from '@/components/common/Button'
 import NowPlayingBar from '@/components/NowPlayingBar'
 import { PlaylistError } from '@/features/playlist/remote/components/PlaylistError'
 import { PlaylistHeader } from '@/features/playlist/remote/components/PlaylistHeader'
@@ -24,7 +23,6 @@ import {
 	useOtherUserInfo,
 } from '@/hooks/queries/bilibili/user'
 import usePreventRemove from '@/hooks/router/usePreventRemove'
-import useAppStore from '@/hooks/stores/useAppStore'
 import { useModalStore } from '@/hooks/stores/useModalStore'
 import { useDoubleTapScrollToTop } from '@/hooks/ui/useDoubleTapScrollToTop'
 import { usePlaylistBackgroundColor } from '@/hooks/ui/usePlaylistBackgroundColor'
@@ -77,7 +75,6 @@ export default function UploaderPage() {
 	const { colors } = theme
 	const router = useRouter()
 	const [refreshing, setRefreshing] = useState(false)
-	const enable = useAppStore((state) => state.hasBilibiliCookie())
 
 	const {
 		selected,
@@ -170,32 +167,6 @@ export default function UploaderPage() {
 
 	if (typeof mid !== 'string') {
 		return null
-	}
-
-	if (!enable) {
-		return (
-			<View
-				style={[styles.loginContainer, { backgroundColor: colors.background }]}
-			>
-				<Text
-					variant='titleMedium'
-					style={styles.loginText}
-				>
-					登录{'\u2009bilibili\u2009'}账号后才能查看{'\u2009up\u2009'}主作品
-					{'\n\n'}
-					为什么：bilibili
-					对访问用户个人空间和上传的视频接口有莫名其妙的风控校验
-				</Text>
-				<Button
-					mode='contained'
-					onPress={() => {
-						router.push('/settings/bilibili-account/qrcode-login' as never)
-					}}
-				>
-					登录
-				</Button>
-			</View>
-		)
 	}
 
 	if (isUserInfoPending) {
@@ -325,16 +296,6 @@ export default function UploaderPage() {
 }
 
 const styles = StyleSheet.create({
-	loginContainer: {
-		flex: 1,
-		alignItems: 'center',
-		justifyContent: 'center',
-		gap: 16,
-		paddingHorizontal: 25,
-	},
-	loginText: {
-		textAlign: 'center',
-	},
 	container: {
 		flex: 1,
 	},
