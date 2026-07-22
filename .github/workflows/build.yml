@@ -21,7 +21,6 @@ on:
 
 env:
   NODE_VERSION: 22.x
-  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
   SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MENTION_USER: '@roitium'
@@ -79,9 +78,7 @@ jobs:
       packages: read
     env:
       BUILD_TYPE: ${{ needs.setup.outputs.buildType }}
-      EAS_PROFILE: ${{ needs.setup.outputs.profile }}
       ABI_FILTERS: ${{ matrix.arch }}
-      EAS_LOCAL_BUILD_SKIP_CLEANUP: 1
 
     environment: ${{ (github.event_name == 'pull_request' && 'production') || null }}
 
@@ -101,12 +98,14 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
-      - name: 🏗 Setup EAS
-        uses: expo/expo-github-action@v8
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v4
         with:
-          eas-version: latest
-          token: ${{ env.EXPO_TOKEN }}
-          packager: pnpm
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 🤖 Setup Android SDK
+        uses: android-actions/setup-android@v3
 
       - name: 📦 Install dependencies
         run: pnpm install
@@ -126,7 +125,6 @@ jobs:
           echo "APK_NAME=${APK_NAME}" >> $GITHUB_ENV
           echo "ARTIFACT_DIR=${ARTIFACT_DIR}" >> $GITHUB_ENV
           echo "APK_TEMP_PATH=${ARTIFACT_DIR}/${APK_NAME}.apk" >> $GITHUB_ENV
-          echo "EAS_LOCAL_BUILD_WORKINGDIR=${RUNNER_TEMP}/eas-local-build-${{ matrix.arch }}" >> $GITHUB_ENV
           echo "VERSION_CODE=${VERSION_CODE}" >> $GITHUB_ENV
 
           echo "apkName=${APK_NAME}" >> $GITHUB_OUTPUT
@@ -140,9 +138,20 @@ jobs:
           mkdir -p apps/mobile/assets/config/google-services
           echo "$FIREBASE_ANDROID_JSON_B64" | base64 -d > apps/mobile/assets/config/google-services/google-services.real.json
 
-      - name: 🚀 Build APK
+      - name: 🏗 Prebuild (Expo)
+        run: cd apps/mobile && npx expo prebuild --platform android
+
+      - name: 🚀 Build APK with Gradle
         if: env.BUILD_TYPE != 'blank-test'
-        run: cd apps/mobile && eas build --platform android --profile ${{ env.EAS_PROFILE }} --local --no-wait --output="$APK_TEMP_PATH"
+        run: |
+          cd apps/mobile/android
+          if [[ "${{ env.BUILD_TYPE }}" == "dev" ]]; then
+            ./gradlew assembleDebug
+            cp app/build/outputs/apk/debug/app-debug.apk "$APK_TEMP_PATH"
+          else
+            ./gradlew assembleRelease
+            find app/build/outputs/apk/release -name "*.apk" -exec cp {} "$ARTIFACT_DIR/" \;
+          fi
 
       - name: 🧪 Create Dummy APK
         if: env.BUILD_TYPE == 'blank-test'
