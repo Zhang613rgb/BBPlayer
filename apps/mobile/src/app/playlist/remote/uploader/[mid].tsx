@@ -286,6 +286,7 @@ export default function UploaderPage() {
 									: undefined
 							}
 							mainButtonIcon={isSubscribed ? 'check' : 'plus'}
+							mainButtonText={isSubscribed ? '已订阅' : '订阅'}
 							id={Number(mid)}
 							primaryButtonColor={primaryButtonColor}
 							primaryButtonTextColor={primaryButtonTextColor}
