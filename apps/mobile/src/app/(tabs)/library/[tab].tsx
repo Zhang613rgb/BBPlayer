@@ -10,21 +10,22 @@ import IconButton from '@/components/common/IconButton'
 import SkinAppbarBackground from '@/components/navigation/SkinAppbarBackground'
 import NowPlayingBar from '@/components/NowPlayingBar'
 import LocalPlaylistListComponent from '@/features/library/local/LocalPlaylistList'
-import MultiPageVideosListComponent from '@/features/library/multipage/MultiPageVideosList'
+import PlayHistoryListComponent from '@/features/library/history/PlayHistoryList'
+import LocalSavedTracksListComponent from '@/features/library/saved/LocalSavedTracksList'
 import SubscribedArtistListComponent from '@/features/library/subscribed/SubscribedArtistList'
 
 const renderScene = SceneMap({
 	local: LocalPlaylistListComponent,
 	favorite: SubscribedArtistListComponent,
-	collection: CollectionListComponent,
-	multiPage: MultiPageVideosListComponent,
+	collection: LocalSavedTracksListComponent,
+	multiPage: PlayHistoryListComponent,
 })
 
 const routes = [
 	{ key: 'local', title: '播放列表' },
 	{ key: 'favorite', title: '订阅' },
-	{ key: 'collection', title: '合集' },
-	{ key: 'multiPage', title: '分 p' },
+	{ key: 'collection', title: '收藏' },
+	{ key: 'multiPage', title: '历史' },
 ]
 
 export enum Tabs {
