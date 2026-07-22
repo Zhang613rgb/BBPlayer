@@ -22,6 +22,10 @@ import {
 	useInfiniteGetUserUploadedVideos,
 	useOtherUserInfo,
 } from '@/hooks/queries/bilibili/user'
+import {
+	useIsSubscribed,
+	useToggleSubscription,
+} from '@/hooks/queries/local/useSubscriptions'
 import usePreventRemove from '@/hooks/router/usePreventRemove'
 import { useModalStore } from '@/hooks/stores/useModalStore'
 import { useDoubleTapScrollToTop } from '@/hooks/ui/useDoubleTapScrollToTop'
@@ -154,6 +158,11 @@ export default function UploaderPage() {
 
 	const trackMenuItems = usePlaylistMenu(playTrack)
 
+	const { data: subscribedInfo } = useIsSubscribed(mid ?? '')
+	const toggleSubscription = useToggleSubscription()
+	const isSubscribed = !!subscribedInfo
+	const subCount = subscribedInfo?.subscriberCount ?? 0
+
 	useEffect(() => {
 		if (typeof mid !== 'string') {
 			router.replace('/+not-found')
@@ -263,8 +272,20 @@ export default function UploaderPage() {
 							title={uploaderUserInfo.name}
 							subtitles={`${uploadedVideos?.pages[0].page.count ?? 0}\u2009首歌曲`}
 							description={uploaderUserInfo.sign}
-							onClickMainButton={undefined}
-							mainButtonIcon={'sync'}
+							onClickMainButton={
+								uploaderUserInfo && !toggleSubscription.isPending
+									? () => {
+											toggleSubscription.mutate({
+												remoteId: mid,
+												name: uploaderUserInfo.name,
+												avatarUrl: uploaderUserInfo.face,
+												signature: uploaderUserInfo.sign,
+												subscribe: !isSubscribed,
+											})
+										}
+									: undefined
+							}
+							mainButtonIcon={isSubscribed ? 'check' : 'plus'}
 							id={Number(mid)}
 							primaryButtonColor={primaryButtonColor}
 							primaryButtonTextColor={primaryButtonTextColor}

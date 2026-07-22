@@ -20,6 +20,10 @@ export const artists = sqliteTable(
 			enum: ['bilibili', 'local'],
 		}).notNull(),
 		remoteId: text('remote_id'), // 比如 bilibili mid
+		subscribed: integer('subscribed', { mode: 'boolean' })
+			.notNull()
+			.default(false),
+		subscribedAt: integer('subscribed_at', { mode: 'timestamp_ms' }),
 		createdAt: integer('created_at', { mode: 'timestamp_ms' })
 			.notNull()
 			.default(sql`(unixepoch() * 1000)`),

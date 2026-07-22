@@ -9,21 +9,20 @@ import { SceneMap, TabBar, TabView } from 'react-native-tab-view'
 import IconButton from '@/components/common/IconButton'
 import SkinAppbarBackground from '@/components/navigation/SkinAppbarBackground'
 import NowPlayingBar from '@/components/NowPlayingBar'
-import CollectionListComponent from '@/features/library/collection/CollectionList'
-import FavoriteFolderListComponent from '@/features/library/favorite/FavoriteFolderList'
 import LocalPlaylistListComponent from '@/features/library/local/LocalPlaylistList'
 import MultiPageVideosListComponent from '@/features/library/multipage/MultiPageVideosList'
+import SubscribedArtistListComponent from '@/features/library/subscribed/SubscribedArtistList'
 
 const renderScene = SceneMap({
 	local: LocalPlaylistListComponent,
-	favorite: FavoriteFolderListComponent,
+	favorite: SubscribedArtistListComponent,
 	collection: CollectionListComponent,
 	multiPage: MultiPageVideosListComponent,
 })
 
 const routes = [
 	{ key: 'local', title: '播放列表' },
-	{ key: 'favorite', title: '收藏夹' },
+	{ key: 'favorite', title: '订阅' },
 	{ key: 'collection', title: '合集' },
 	{ key: 'multiPage', title: '分 p' },
 ]

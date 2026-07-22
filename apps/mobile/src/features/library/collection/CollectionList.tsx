@@ -5,7 +5,6 @@ import { Text, useTheme } from 'react-native-paper'
 
 import ActivityIndicator from '@/components/common/ActivityIndicator'
 import { DataFetchingError } from '@/features/library/shared/DataFetchingError'
-import TabDisable from '@/features/library/shared/TabDisabled'
 import { CollectionListSkeleton } from '@/features/library/skeletons/LibraryTabSkeleton'
 import useCurrentTrack from '@/hooks/player/useCurrentTrack'
 import { useInfiniteCollectionsList } from '@/hooks/queries/bilibili/favorite'
@@ -48,7 +47,22 @@ const CollectionListComponent = memo(() => {
 	}
 
 	if (!enable) {
-		return <TabDisable />
+		return (
+			<View style={styles.emptyContainer}>
+				<Text
+					variant='titleMedium'
+					style={styles.emptyText}
+				>
+					登录 B 站账号后查看合集
+				</Text>
+				<Text
+					variant='bodyMedium'
+					style={{ color: colors.onSurfaceVariant }}
+				>
+					在设置中登录即可同步你的合集
+				</Text>
+			</View>
+		)
 	}
 
 	if (collectionsIsPending) {
@@ -117,6 +131,16 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		marginHorizontal: 16,
+	},
+	emptyContainer: {
+		flex: 1,
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingTop: 80,
+		gap: 8,
+	},
+	emptyText: {
+		textAlign: 'center',
 	},
 	headerContainer: {
 		height: 48,
