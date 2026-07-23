@@ -73,6 +73,7 @@ jobs:
 
       - name: 🚀 Build APK (EAS local)
         if: env.BUILD_TYPE != 'blank-test'
+        timeout-minutes: 40
         run: |
           cd apps/mobile
           eas build --platform android --profile ${{ env.EAS_PROFILE }} --local --output="${{ env.APK_TEMP_PATH }}" 2>&1
