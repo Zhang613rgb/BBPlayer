@@ -91,9 +91,12 @@ const SubscribedArtistListComponent = memo(() => {
 		}) => (
 			<SubscribedArtistListItem
 				item={item}
-				onPress={(remoteId) => {
-					router.push(`/playlist/remote/uploader/${remoteId}`)
-				}}
+			onPress={(remoteId) => {
+				router.push({
+					pathname: '/playlist/remote/uploader/[mid]',
+					params: { mid: remoteId },
+				})
+			}}
 			/>
 		),
 		[router],

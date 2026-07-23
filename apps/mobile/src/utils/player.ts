@@ -203,6 +203,14 @@ async function addToQueue({
 			const result = convertToOrpheusTrack(track)
 			if (result.isOk()) {
 				orpheusTracks.push(result.value)
+				// 关键修复：曲目入队即落库。
+				// 否则 bilibili 曲目从未写入本地 DB，
+				// usePlayerStore.sync() 的 getTrackByUniqueKey 找不到 → internalTrack 为 null
+				// → 播放器本地收藏(❤)与播放历史均失效。
+				const payload = trackToCreatePayload(track)
+				if (payload) {
+					await trackService.findOrCreateTrack(payload).mapErr(() => undefined)
+				}
 			} else {
 				logger.error('转换为 OrpheusTrack 失败，跳过该曲目', {
 					trackId: track.id,
