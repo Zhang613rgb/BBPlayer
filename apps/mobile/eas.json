@@ -56,7 +56,7 @@
 			"distribution": "internal",
 			"android": {
 				"buildType": "apk",
-				"gradleCommand": ":app:assembleRelease"
+				"gradleCommand": ":app:assembleDebug"
 			},
 			"channel": "preview",
 			"env": {

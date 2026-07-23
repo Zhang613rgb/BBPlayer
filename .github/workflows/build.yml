@@ -16,6 +16,7 @@ on:
 
 env:
   NODE_VERSION: 22.x
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
   SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -26,8 +27,7 @@ jobs:
       contents: write
     env:
       BUILD_TYPE: ${{ github.event.inputs.buildType || 'dev' }}
-      APP_VARIANT: production
-      ABI_FILTERS: arm64-v8a
+      EAS_PROFILE: ${{ github.event.inputs.buildType == 'prod' && 'prod-ci' || 'preview' }}
     steps:
       - name: 🏗 Setup repo
         uses: actions/checkout@v5
@@ -52,37 +52,38 @@ jobs:
       - name: 🤖 Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: 🏗 Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ env.EXPO_TOKEN }}
+          packager: pnpm
+
       - name: 📦 Install dependencies
         run: pnpm install
 
-      - name: 🏗 Prebuild (expo -> android)
-        run: cd apps/mobile && npx expo prebuild --platform android 2>&1
-
-      - name: 📦 Bundle JS (expo export)
+      - name: ⚙️ Prepare Variables
         run: |
-          cd apps/mobile
-          npx expo export --platform android 2>&1
-          echo "=== dist contents ==="
-          find dist -type f | head -20
-          mkdir -p android/app/src/main/assets
-          cp dist/index.android.js android/app/src/main/assets/index.android.bundle 2>/dev/null || \
-          cp dist/android-index.android.js android/app/src/main/assets/index.android.bundle 2>/dev/null || \
-          find dist -name "*.android.bundle" -exec cp {} android/app/src/main/assets/index.android.bundle \; 2>/dev/null || true
-          echo "=== assets after copy ==="
-          ls -la android/app/src/main/assets/ 2>/dev/null
+          APP_VERSION=$(node -p "require('./apps/mobile/package.json').version")
+          VERSION_CODE=$(git rev-list --count HEAD)
+          APK_NAME="bbplayer-v${APP_VERSION}-${{ env.BUILD_TYPE }}-arm64-v8a"
+          echo "APK_NAME=${APK_NAME}" >> $GITHUB_ENV
+          echo "APK_TEMP_PATH=${RUNNER_TEMP}/${APK_NAME}.apk" >> $GITHUB_ENV
+          echo "VERSION_CODE=${VERSION_CODE}" >> $GITHUB_ENV
 
-      - name: 🚀 Build APK
+      - name: 🚀 Build APK (EAS local)
         if: env.BUILD_TYPE != 'blank-test'
         run: |
-          cd apps/mobile/android && ./gradlew assembleDebug 2>&1
-          ARTIFACT_DIR="${RUNNER_TEMP}/bbplayer-apk"
-          mkdir -p "$ARTIFACT_DIR"
-          find app/build/outputs/apk -name "*.apk" -exec cp {} "$ARTIFACT_DIR/" \;
-          echo "APK_DIR=$ARTIFACT_DIR" >> $GITHUB_ENV
+          cd apps/mobile
+          eas build --platform android --profile ${{ env.EAS_PROFILE }} --local --output="${{ env.APK_TEMP_PATH }}" 2>&1
+
+      - name: 🧪 Create Dummy APK
+        if: env.BUILD_TYPE == 'blank-test'
+        run: echo "dummy" > "${{ env.APK_TEMP_PATH }}"
 
       - name: 🚀 Upload APK
         uses: actions/upload-artifact@v5
         with:
-          name: bbplayer-${{ env.BUILD_TYPE }}
-          path: ${{ env.APK_DIR }}
+          name: ${{ env.APK_NAME }}
+          path: ${{ env.APK_TEMP_PATH }}
           if-no-files-found: error
