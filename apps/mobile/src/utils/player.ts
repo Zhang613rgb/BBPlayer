@@ -4,12 +4,14 @@ import { err, ok } from 'neverthrow'
 
 import { trackKeys } from '@/hooks/queries/db/track'
 import useAppStore from '@/hooks/stores/useAppStore'
+import usePlayerStore from '@/hooks/stores/usePlayerStore'
 import { bilibiliApi } from '@/lib/api/bilibili/api'
 import { queryClient } from '@/lib/config/queryClient'
 import type { PlayerError } from '@/lib/errors/player'
 import { createPlayerError } from '@/lib/errors/player'
 import type { BilibiliApiError } from '@/lib/errors/thirdparty/bilibili'
 import { trackService } from '@/lib/services/trackService'
+import type { CreateTrackPayload } from '@/types/services/track'
 import type { Track } from '@/types/core/media'
 
 import { toastAndLogError } from './error-handling'
@@ -22,6 +24,36 @@ const logger = log.extend('Utils.Player')
  * @param track - 内部 Track 对象。
  * @returns 一个 Result 对象，成功时包含 OrpheusTrack，失败时包含 Error。
  */
+function trackToCreatePayload(track: Track): CreateTrackPayload | null {
+	if (track.source === 'bilibili') {
+		if (!track.bilibiliMetadata?.bvid) return null
+		return {
+			source: 'bilibili',
+			title: track.title,
+			coverUrl: track.coverUrl,
+			duration: track.duration,
+			bilibiliMetadata: {
+				bvid: track.bilibiliMetadata.bvid,
+				isMultiPage: track.bilibiliMetadata.isMultiPage,
+				cid: track.bilibiliMetadata.cid,
+				videoIsValid: track.bilibiliMetadata.videoIsValid,
+				mainTrackTitle: track.bilibiliMetadata.mainTrackTitle ?? null,
+			},
+		}
+	}
+	if (track.source === 'local') {
+		if (!track.localMetadata?.localPath) return null
+		return {
+			source: 'local',
+			title: track.title,
+			coverUrl: track.coverUrl,
+			duration: track.duration,
+			localMetadata: { localPath: track.localMetadata.localPath },
+		}
+	}
+	return null
+}
+
 function convertToOrpheusTrack(
 	track: Track,
 ): Result<OrpheusTrack, BilibiliApiError | PlayerError> {
@@ -233,6 +265,17 @@ async function finalizeAndRecordCurrentTrack(
 			completed,
 			uniqueKey,
 		})
+
+		// 确保当前 track 已落库：历史记录依赖 tracks 表外键，
+		// 而普通播放流程从不为 bilibili 曲目建立本地记录，
+		// 会导致下面写历史时找不到 track 而静默失败（历史为空）。
+		const currentTrack = usePlayerStore.getState().internalTrack
+		if (currentTrack) {
+			const payload = trackToCreatePayload(currentTrack)
+			if (payload) {
+				await trackService.findOrCreateTrack(payload).mapErr(() => undefined)
+			}
+		}
 
 		const res = await trackService.addPlayRecordFromUniqueKey(uniqueKey, {
 			startTime: (Date.now() - playedSeconds * 1000) / 1000,

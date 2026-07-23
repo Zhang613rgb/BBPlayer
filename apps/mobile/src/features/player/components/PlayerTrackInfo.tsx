@@ -16,14 +16,11 @@ import SquircleView from 'react-native-fast-squircle'
 import { Text, TouchableRipple, useTheme } from 'react-native-paper'
 
 import IconButton from '@/components/common/IconButton'
-import { useThumbUpVideo } from '@/hooks/mutations/bilibili/video'
 import useCurrentTrack from '@/hooks/player/useCurrentTrack'
-import { useGetVideoIsThumbUp } from '@/hooks/queries/bilibili/video'
+import { useLocalFavorite } from '@/hooks/player/useLocalFavorite'
 import useAppStore from '@/hooks/stores/useAppStore'
-import useActiveSkin from '@/hooks/theme/useActiveSkin'
 import { getGradientColors } from '@/utils/color'
 
-import SkinThumbUpBurst from './SkinThumbUpBurst'
 import { SpectrumVisualizer } from './SpectrumVisualizer'
 
 const { width: screenWidth } = Dimensions.get('window')
@@ -47,21 +44,11 @@ export function TrackInfo({
 	const currentTrack = useCurrentTrack()
 	const isPlaying = useIsPlaying()
 	const [isTitleExpanded, setIsTitleExpanded] = useState(false)
-	const [thumbUpBurstSignal, setThumbUpBurstSignal] = useState(0)
-	const activeSkin = useActiveSkin()
-
 	const enableSpectrumVisualizer = useAppStore(
 		(state) => state.settings.enableSpectrumVisualizer,
 	)
 
-	const { data: isThumbUp, isPending: isThumbUpPending } = useGetVideoIsThumbUp(
-		currentTrack?.source === 'bilibili'
-			? currentTrack?.bilibiliMetadata.bvid
-			: undefined,
-	)
-	const { mutate: doThumbUpAction } = useThumbUpVideo()
-
-	const isBilibiliVideo = currentTrack?.source === 'bilibili'
+	const { isFavorited, toggle: toggleFavorite } = useLocalFavorite()
 
 	const { color1, color2 } = getGradientColors(
 		currentTrack?.title ?? '',
@@ -80,17 +67,6 @@ export function TrackInfo({
 	const coverBorderRadius = enableSpectrumVisualizer
 		? coverSize / 2
 		: COVER_SIZE_RECT * 0.22
-
-	const onThumbUpPress = () => {
-		if (isThumbUpPending || !isBilibiliVideo || !currentTrack) return
-		if (!isThumbUp) {
-			setThumbUpBurstSignal((signal) => signal + 1)
-		}
-		doThumbUpAction({
-			bvid: currentTrack.bilibiliMetadata.bvid,
-			like: !isThumbUp,
-		})
-	}
 
 	useEffect(() => {
 		setIsTitleExpanded(false)
@@ -237,20 +213,16 @@ export function TrackInfo({
 							</TouchableRipple>
 						)}
 					</View>
-					{isBilibiliVideo && (
-						<View style={styles.thumbUpButtonContainer}>
-							<SkinThumbUpBurst
-								skin={activeSkin}
-								playSignal={thumbUpBurstSignal}
-							/>
-							<IconButton
-								icon={isThumbUp ? 'heart' : 'heart-outline'}
-								size={24}
-								iconColor={isThumbUp ? colors.error : colors.onSurfaceVariant}
-								onPress={onThumbUpPress}
-							/>
-						</View>
-					)}
+				{currentTrack && (
+					<View style={styles.thumbUpButtonContainer}>
+						<IconButton
+							icon={isFavorited ? 'heart' : 'heart-out-line'}
+							size={24}
+							iconColor={isFavorited ? colors.error : colors.onSurfaceVariant}
+							onPress={toggleFavorite}
+						/>
+					</View>
+				)}
 				</View>
 			</View>
 		</View>

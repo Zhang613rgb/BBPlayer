@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router'
 import { memo, useCallback, useState } from 'react'
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native'
-import { Avatar, Text, useTheme } from 'react-native-paper'
+import { Avatar, Text, TouchableRipple, useTheme } from 'react-native-paper'
 
 import ActivityIndicator from '@/components/common/ActivityIndicator'
 import { DataFetchingError } from '@/features/library/shared/DataFetchingError'
@@ -25,8 +25,11 @@ const SubscribedArtistListItem = memo(
 		onPress: (remoteId: string) => void
 	}) => {
 		const { colors } = useTheme()
+		const handlePress = () => {
+			if (item.remoteId) onPress(item.remoteId)
+		}
 		return (
-			<View style={styles.artistItem}>
+			<TouchableRipple onPress={handlePress} style={styles.artistItem}>
 				<Avatar.Image
 					size={48}
 					source={{ uri: resolveBilibiliImageUrl(item.avatarUrl) }}
@@ -48,7 +51,7 @@ const SubscribedArtistListItem = memo(
 						</Text>
 					) : null}
 				</View>
-			</View>
+			</TouchableRipple>
 		)
 	},
 )
