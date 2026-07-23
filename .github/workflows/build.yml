@@ -60,13 +60,15 @@ jobs:
 
       - name: 📦 Bundle JS
         run: |
-          mkdir -p apps/mobile/android/app/src/main/assets
-          cd apps/mobile && npx --no-install react-native bundle \
+          cd apps/mobile
+          mkdir -p android/app/src/main/assets
+          ABS="$(pwd)"
+          npx --no-install react-native bundle \
             --platform android \
             --dev false \
-            --entry-file index.js \
-            --bundle-output android/app/src/main/assets/index.android.bundle \
-            --assets-dest android/app/src/main/res 2>&1
+            --entry-file "${ABS}/index.js" \
+            --bundle-output "${ABS}/android/app/src/main/assets/index.android.bundle" \
+            --assets-dest "${ABS}/android/app/src/main/res" 2>&1
 
       - name: 🚀 Build APK
         if: env.BUILD_TYPE != 'blank-test'
