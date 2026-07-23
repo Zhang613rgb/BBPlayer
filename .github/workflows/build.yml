@@ -58,17 +58,18 @@ jobs:
       - name: 🏗 Prebuild (expo -> android)
         run: cd apps/mobile && npx expo prebuild --platform android 2>&1
 
-      - name: 📦 Bundle JS
+      - name: 📦 Bundle JS (expo export)
         run: |
           cd apps/mobile
+          npx expo export --platform android 2>&1
+          echo "=== dist contents ==="
+          find dist -type f | head -20
           mkdir -p android/app/src/main/assets
-          ABS="$(pwd)"
-          npx --no-install react-native bundle \
-            --platform android \
-            --dev false \
-            --entry-file "${ABS}/index.js" \
-            --bundle-output "${ABS}/android/app/src/main/assets/index.android.bundle" \
-            --assets-dest "${ABS}/android/app/src/main/res" 2>&1
+          cp dist/index.android.js android/app/src/main/assets/index.android.bundle 2>/dev/null || \
+          cp dist/android-index.android.js android/app/src/main/assets/index.android.bundle 2>/dev/null || \
+          find dist -name "*.android.bundle" -exec cp {} android/app/src/main/assets/index.android.bundle \; 2>/dev/null || true
+          echo "=== assets after copy ==="
+          ls -la android/app/src/main/assets/ 2>/dev/null
 
       - name: 🚀 Build APK
         if: env.BUILD_TYPE != 'blank-test'
