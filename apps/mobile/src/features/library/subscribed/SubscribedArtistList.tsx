@@ -30,26 +30,28 @@ const SubscribedArtistListItem = memo(
 		}
 		return (
 			<TouchableRipple onPress={handlePress} style={styles.artistItem}>
-				<Avatar.Image
-					size={48}
-					source={{ uri: resolveBilibiliImageUrl(item.avatarUrl) }}
-				/>
-				<View style={styles.artistInfo}>
-					<Text
-						variant='titleSmall'
-						numberOfLines={1}
-					>
-						{item.name}
-					</Text>
-					{item.signature ? (
+				<View style={styles.artistRow}>
+					<Avatar.Image
+						size={48}
+						source={{ uri: resolveBilibiliImageUrl(item.avatarUrl) }}
+					/>
+					<View style={styles.artistInfo}>
 						<Text
-							variant='bodySmall'
+							variant='titleSmall'
 							numberOfLines={1}
-							style={{ color: colors.onSurfaceVariant }}
 						>
-							{item.signature}
+							{item.name}
 						</Text>
-					) : null}
+						{item.signature ? (
+							<Text
+								variant='bodySmall'
+								numberOfLines={1}
+								style={{ color: colors.onSurfaceVariant }}
+							>
+								{item.signature}
+							</Text>
+						) : null}
+					</View>
 				</View>
 			</TouchableRipple>
 		)
@@ -159,10 +161,13 @@ const styles = StyleSheet.create({
 		paddingTop: 8,
 	},
 	artistItem: {
+		paddingVertical: 10,
+	},
+	artistRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		paddingVertical: 10,
 		gap: 12,
+		flex: 1,
 	},
 	artistInfo: {
 		flex: 1,
