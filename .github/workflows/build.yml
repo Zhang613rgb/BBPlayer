@@ -21,6 +21,7 @@ on:
 
 env:
   NODE_VERSION: 22.x
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
   SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MENTION_USER: '@roitium'
@@ -61,9 +62,9 @@ jobs:
              echo "matrix={\"include\":[{\"arch\":\"arm64-v8a\"}]}" >> $GITHUB_OUTPUT
              echo "profile=blank-test" >> $GITHUB_OUTPUT
           else
-            # dev, preview - default to arm64-v8a
+            # dev, preview - default to arm64-v8a, use preview profile (standalone debug APK)
             echo "matrix={\"include\":[{\"arch\":\"arm64-v8a\"}]}" >> $GITHUB_OUTPUT
-            echo "profile=$BUILD_TYPE" >> $GITHUB_OUTPUT
+            echo "profile=preview" >> $GITHUB_OUTPUT
           fi
 
   build:
@@ -78,7 +79,9 @@ jobs:
       packages: read
     env:
       BUILD_TYPE: ${{ needs.setup.outputs.buildType }}
+      EAS_PROFILE: ${{ needs.setup.outputs.profile }}
       ABI_FILTERS: ${{ matrix.arch }}
+      EAS_LOCAL_BUILD_SKIP_CLEANUP: 1
 
     environment: ${{ (github.event_name == 'pull_request' && 'production') || null }}
 
@@ -137,23 +140,43 @@ jobs:
           mkdir -p apps/mobile/assets/config/google-services
           echo "$FIREBASE_ANDROID_JSON_B64" | base64 -d > apps/mobile/assets/config/google-services/google-services.real.json
 
-      - name: 🏗 Prebuild native project
-        run: cd apps/mobile && npx expo prebuild --platform android 2>&1
+      - name: 🏗 Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+          packager: pnpm
 
-      - name: 📦 Bundle JS and build APK
+      - name: ⚙️ Prepare Variables
+        id: prepare-vars
         run: |
-          cd apps/mobile
-          npx expo export --platform android 2>&1
-          cp -r dist/* android/app/src/main/assets/ 2>/dev/null || true
-          cd android && ./gradlew assembleDebug 2>&1
-          find app/build/outputs/apk -name "*.apk" -exec cp {} "$ARTIFACT_DIR/" \;
+          APP_VERSION=$(node -p "require('./apps/mobile/package.json').version")
+          VERSION_CODE=$(git rev-list --count HEAD)
 
-      - name: 🚀 Build Release APK
-        if: env.BUILD_TYPE == 'prod'
+          APK_NAME="bbplayer-v${APP_VERSION}-${{ env.BUILD_TYPE }}-${{ matrix.arch }}"
+          ARTIFACT_DIR="${RUNNER_TEMP}/${APK_NAME}"
+
+          mkdir -p "$ARTIFACT_DIR"
+
+          echo "APK_NAME=${APK_NAME}" >> $GITHUB_ENV
+          echo "ARTIFACT_DIR=${ARTIFACT_DIR}" >> $GITHUB_ENV
+          echo "APK_TEMP_PATH=${ARTIFACT_DIR}/${APK_NAME}.apk" >> $GITHUB_ENV
+          echo "VERSION_CODE=${VERSION_CODE}" >> $GITHUB_ENV
+
+          echo "apkName=${APK_NAME}" >> $GITHUB_OUTPUT
+          echo "artifactDir=${ARTIFACT_DIR}" >> $GITHUB_OUTPUT
+
+      - name: ⚙️ Prepare Firebase Config
+        env:
+          FIREBASE_ANDROID_JSON_B64: ${{ secrets.FIREBASE_ANDROID_JSON_B64 }}
+        if: ${{ env.FIREBASE_ANDROID_JSON_B64 != '' }}
         run: |
-          cd apps/mobile/android
-          ./gradlew assembleRelease 2>&1
-          find app/build/outputs/apk/release -name "*.apk" -exec cp {} "$ARTIFACT_DIR/" \;
+          mkdir -p apps/mobile/assets/config/google-services
+          echo "$FIREBASE_ANDROID_JSON_B64" | base64 -d > apps/mobile/assets/config/google-services/google-services.real.json
+
+      - name: 🚀 Build APK with EAS
+        if: env.BUILD_TYPE != 'blank-test'
+        run: cd apps/mobile && eas build --platform android --profile ${{ env.EAS_PROFILE }} --local --no-wait --output="$APK_TEMP_PATH" 2>&1
 
       - name: 🧪 Create Dummy APK
         if: env.BUILD_TYPE == 'blank-test'
