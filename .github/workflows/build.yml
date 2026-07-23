@@ -62,7 +62,7 @@ jobs:
         run: |
           cd apps/mobile
           mkdir -p android/app/src/main/assets
-          node ../node_modules/.bin/react-native bundle \
+          node ../../node_modules/.bin/react-native bundle \
             --platform android \
             --dev false \
             --entry-file index.js \
