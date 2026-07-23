@@ -21,6 +21,7 @@ on:
 
 env:
   NODE_VERSION: 22.x
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
   SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MENTION_USER: '@roitium'
@@ -98,14 +99,12 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
-      - name: ☕ Setup Java
-        uses: actions/setup-java@v4
+      - name: 🏗 Setup EAS
+        uses: expo/expo-github-action@v8
         with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: 🤖 Setup Android SDK
-        uses: android-actions/setup-android@v3
+          eas-version: latest
+          token: ${{ env.EXPO_TOKEN }}
+          packager: pnpm
 
       - name: 📦 Install dependencies
         run: pnpm install
@@ -117,49 +116,26 @@ jobs:
           VERSION_CODE=$(git rev-list --count HEAD)
 
           APK_NAME="bbplayer-v${APP_VERSION}-${{ env.BUILD_TYPE }}-${{ matrix.arch }}"
-          ARTIFACT_DIR="${RUNNER_TEMP}/${APK_NAME}"
-
-          mkdir -p "$ARTIFACT_DIR"
-
           echo "APK_NAME=${APK_NAME}" >> $GITHUB_ENV
-          echo "ARTIFACT_DIR=${ARTIFACT_DIR}" >> $GITHUB_ENV
-          echo "APK_TEMP_PATH=${ARTIFACT_DIR}/${APK_NAME}.apk" >> $GITHUB_ENV
           echo "VERSION_CODE=${VERSION_CODE}" >> $GITHUB_ENV
 
           echo "apkName=${APK_NAME}" >> $GITHUB_OUTPUT
-          echo "artifactDir=${ARTIFACT_DIR}" >> $GITHUB_OUTPUT
 
-      - name: ⚙️ Prepare Firebase Config
-        env:
-          FIREBASE_ANDROID_JSON_B64: ${{ secrets.FIREBASE_ANDROID_JSON_B64 }}
-        if: ${{ env.FIREBASE_ANDROID_JSON_B64 != '' }}
-        run: |
-          mkdir -p apps/mobile/assets/config/google-services
-          echo "$FIREBASE_ANDROID_JSON_B64" | base64 -d > apps/mobile/assets/config/google-services/google-services.real.json
-
-      - name: 🏗 Prebuild native project
-        run: cd apps/mobile && npx expo prebuild --platform android 2>&1
-
-      - name: 📦 Bundle JS and build APK
+      - name: ☁️ Submit EAS cloud build
         run: |
           cd apps/mobile
-          npx expo export --platform android 2>&1
-          mkdir -p android/app/src/main/assets
-          cp -r dist/* android/app/src/main/assets/ 2>/dev/null || true
-          cd android && ./gradlew assembleDebug 2>&1
-          find app/build/outputs/apk -name "*.apk" -exec cp {} "$ARTIFACT_DIR/" \;
+          eas build --platform android --profile preview --non-interactive --no-wait 2>&1
 
       - name: 🧪 Create Dummy APK
         if: env.BUILD_TYPE == 'blank-test'
         run: |
-          echo "Dummy APK $APK_NAME" > "$APK_TEMP_PATH"
+          echo "Dummy APK $APK_NAME" > /tmp/dummy.txt
 
-      - name: 🚀 Upload Artifact
-        uses: actions/upload-artifact@v5
-        with:
-          name: ${{ steps.prepare-vars.outputs.apkName }}
-          path: ${{ steps.prepare-vars.outputs.artifactDir }}
-          if-no-files-found: error
+      - name: 📝 Log build URL
+        run: |
+          echo "✅ 构建已提交到 EAS 云服务器"
+          echo "查看进度: https://expo.dev/accounts/anyhow8601s-team/projects/bbplayer/builds"
+          echo "构建完成后可在以上页面下载 APK"
 
   release:
     needs: [setup, build]
