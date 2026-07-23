@@ -14,6 +14,7 @@ const SORT_KEY_MIGRATED_V2_KEY = 'sort_key_migrated_v2' // gitleaks:allow
 const SORT_KEY_MIGRATED_V3_KEY = 'sort_key_migrated_v3' // gitleaks:allow
 const PLAY_HISTORY_MIGRATED_V1_KEY = 'play_history_migrated_v1' // gitleaks:allow
 const INDEPENDENT_ACCOUNT_MIGRATED_V1_KEY = 'independent_account_migrated_v1' // gitleaks:allow
+const ARTISTS_SUB_MIGRATED_V1_KEY = 'artists_subscribed_migrated_v1' // gitleaks:allow
 
 interface MigrationConfig {
 	journal: {
@@ -261,6 +262,47 @@ function migrateIndependentAccountReset(): void {
 	}
 }
 
+/**
+ * 迁移 artists 表：补齐 subscribed / subscribed_at 列。
+ * 早期设备升级时 drizzle SQL 迁移（0022_plain_magik.sql）未生效，
+ * 导致订阅/收藏查询报 "no such column: artists.subscribed_at"。
+ * 这里做自愈：PRAGMA 检查后按需 ALTER，幂等，每次启动都会过一遍。
+ */
+function migrateArtistsSubscribedColumns(): void {
+	if (storage.getBoolean(ARTISTS_SUB_MIGRATED_V1_KEY)) return
+
+	try {
+		const info = expoDb.getAllSync<{ name: string }>(
+			`PRAGMA table_info(artists)`,
+		)
+		const hasSubscribed = info.some((c) => c.name === 'subscribed')
+		const hasSubscribedAt = info.some((c) => c.name === 'subscribed_at')
+
+		if (hasSubscribed && hasSubscribedAt) {
+			logger.info('[artists] subscribed 列已存在，无需迁移')
+			storage.set(ARTISTS_SUB_MIGRATED_V1_KEY, true)
+			return
+		}
+
+		expoDb.withTransactionSync(() => {
+			if (!hasSubscribed) {
+				expoDb.runSync(
+					`ALTER TABLE artists ADD COLUMN subscribed integer DEFAULT false NOT NULL`,
+				)
+			}
+			if (!hasSubscribedAt) {
+				expoDb.runSync(
+					`ALTER TABLE artists ADD COLUMN subscribed_at integer`,
+				)
+			}
+		})
+		logger.info('[artists] 已补齐 subscribed / subscribed_at 列')
+		storage.set(ARTISTS_SUB_MIGRATED_V1_KEY, true)
+	} catch (error) {
+		logger.error('[artists] 补齐 subscribed 列失败:', error)
+	}
+}
+
 export const useFastMigrations = (
 	db: ExpoSQLiteDatabase<Record<string, unknown>>,
 	migrations: MigrationConfig,
@@ -296,10 +338,11 @@ export const useFastMigrations = (
 
 			if (cachedVersion === latestVersion) {
 				// SQL 迁移已是最新，检查/执行 JS 层迁移
-				migrateSortKeysV2()
-				migrateSortKeysV3()
-				migratePlayHistory()
-				migrateIndependentAccountReset()
+			migrateSortKeysV2()
+			migrateSortKeysV3()
+			migratePlayHistory()
+			migrateIndependentAccountReset()
+			migrateArtistsSubscribedColumns()
 				dispatch({ type: 'migrated', payload: true })
 				return
 			}
@@ -309,10 +352,11 @@ export const useFastMigrations = (
 			try {
 				await migrate(db, migrations)
 				// SQL 迁移完成后立刻检查/执行 JS 层迁移
-				migrateSortKeysV2()
-				migrateSortKeysV3()
-				migratePlayHistory()
-				migrateIndependentAccountReset()
+			migrateSortKeysV2()
+			migrateSortKeysV3()
+			migratePlayHistory()
+			migrateIndependentAccountReset()
+			migrateArtistsSubscribedColumns()
 
 				storage.set(SCHEMA_VERSION_KEY, latestVersion)
 				dispatch({ type: 'migrated', payload: true })
