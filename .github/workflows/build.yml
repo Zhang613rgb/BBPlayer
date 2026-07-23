@@ -21,7 +21,6 @@ on:
 
 env:
   NODE_VERSION: 22.x
-  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
   SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MENTION_USER: '@roitium'
@@ -79,9 +78,7 @@ jobs:
       packages: read
     env:
       BUILD_TYPE: ${{ needs.setup.outputs.buildType }}
-      EAS_PROFILE: ${{ needs.setup.outputs.profile }}
       ABI_FILTERS: ${{ matrix.arch }}
-      EAS_LOCAL_BUILD_SKIP_CLEANUP: 1
 
     environment: ${{ (github.event_name == 'pull_request' && 'production') || null }}
 
@@ -140,16 +137,17 @@ jobs:
           mkdir -p apps/mobile/assets/config/google-services
           echo "$FIREBASE_ANDROID_JSON_B64" | base64 -d > apps/mobile/assets/config/google-services/google-services.real.json
 
-      - name: 🏗 Setup EAS
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-          packager: pnpm
+      - name: 🏗 Prebuild native project
+        run: cd apps/mobile && npx expo prebuild --platform android 2>&1
 
-      - name: 🚀 Build APK with EAS
-        if: env.BUILD_TYPE != 'blank-test'
-        run: cd apps/mobile && eas build --platform android --profile ${{ env.EAS_PROFILE }} --local --no-wait --output="$APK_TEMP_PATH" 2>&1
+      - name: 📦 Bundle JS and build APK
+        run: |
+          cd apps/mobile
+          npx expo export --platform android 2>&1
+          mkdir -p android/app/src/main/assets
+          cp -r dist/* android/app/src/main/assets/ 2>/dev/null || true
+          cd android && ./gradlew assembleDebug 2>&1
+          find app/build/outputs/apk -name "*.apk" -exec cp {} "$ARTIFACT_DIR/" \;
 
       - name: 🧪 Create Dummy APK
         if: env.BUILD_TYPE == 'blank-test'
