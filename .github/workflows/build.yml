@@ -53,16 +53,29 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: 📦 Install dependencies
-        run: cd apps/mobile && pnpm install
+        run: pnpm install
 
-      - name: 🏗 Prebuild + Bundle + Build APK
-        if: env.BUILD_TYPE != 'blank-test'
+      - name: 🏗 Prebuild (expo -> android)
+        run: cd apps/mobile && npx expo prebuild --platform android 2>&1
+
+      - name: 📦 Bundle JS
         run: |
           cd apps/mobile
-          npx expo run:android --no-install --variant debug 2>&1
+          mkdir -p android/app/src/main/assets
+          node ../node_modules/.bin/react-native bundle \
+            --platform android \
+            --dev false \
+            --entry-file index.js \
+            --bundle-output android/app/src/main/assets/index.android.bundle \
+            --assets-dest android/app/src/main/res 2>&1
+
+      - name: 🚀 Build APK
+        if: env.BUILD_TYPE != 'blank-test'
+        run: |
+          cd apps/mobile/android && ./gradlew assembleDebug 2>&1
           ARTIFACT_DIR="${RUNNER_TEMP}/bbplayer-apk"
           mkdir -p "$ARTIFACT_DIR"
-          find android/app/build/outputs/apk -name "*.apk" -exec cp {} "$ARTIFACT_DIR/" \;
+          find app/build/outputs/apk -name "*.apk" -exec cp {} "$ARTIFACT_DIR/" \;
           echo "APK_DIR=$ARTIFACT_DIR" >> $GITHUB_ENV
 
       - name: 🚀 Upload APK
