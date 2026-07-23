@@ -278,12 +278,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 			eas: {
 				projectId: 'd6d41e59-2eef-4c24-8d54-fbabc58f1739',
 			},
-			updateManifestUrl: 'https://be.bbplayer.roitium.com/update.json',
 		},
 		owner: 'anyhow8601s-team',
+		// 独立 fork：禁用 EAS Update OTA，避免启动期从原作者频道拉取 JS 包覆盖本应用
 		updates: {
-			url: 'https://u.expo.dev/1cbd8d50-e322-4ead-98b6-4ee8b6f2a707',
-			enableBsdiffPatchSupport: true,
+			enabled: false,
 		},
 		ios: {
 			bundleIdentifier: 'com.roitium.bbplayer',

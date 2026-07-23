@@ -8,7 +8,6 @@ import { focusManager, onlineManager } from '@tanstack/react-query'
 import * as Application from 'expo-application'
 import { ObserveRoot, useObserve } from 'expo-observe'
 import { Stack, router } from 'expo-router'
-import * as Updates from 'expo-updates'
 import { useEffect, useState } from 'react'
 import type { AppStateStatus } from 'react-native'
 import { AppState, Platform, StyleSheet, View } from 'react-native'
@@ -44,8 +43,6 @@ const logger = log.extend('UI.RootLayout')
 
 // 初始化 Sentry
 initializeSentry()
-
-const developement = process.env.NODE_ENV === 'development'
 
 function onAppStateChange(status: AppStateStatus) {
 	if (Platform.OS !== 'web') {
@@ -190,23 +187,6 @@ function RootLayout() {
 			logger.error('数据库迁移失败：', migrationsError)
 		}
 	}, [migrationsError])
-
-	useEffect(() => {
-		if (developement) {
-			return
-		}
-		Updates.checkForUpdateAsync()
-			.then((result) => {
-				if (result.isAvailable) {
-					toast.show('有新的热更新，将在下次启动时应用', {
-						id: 'update',
-					})
-				}
-			})
-			.catch((error: Error) => {
-				toastAndLogError('检测更新失败', error, 'UI.RootLayout')
-			})
-	}, [])
 
 	if (migrationsError) {
 		return (
