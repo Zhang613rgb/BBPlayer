@@ -68,9 +68,12 @@ export const usePlayHistoryByDate = (dateStr: string) => {
 
 			const historyRows = await drizzleDb.query.playHistory.findMany({
 				where: (ph, { and, sql }) => {
+					// 注意：play_history.start_time 实际以「秒」存储
+					// (player.ts 写入时做了 /1000)，与 schema 注释的「ms」不符。
+					// 这里直接用秒比对，避免 1000 倍误差导致历史恒空。
 					return and(
-						sql`${ph.startTime} >= ${startTimeS * 1000}`,
-						sql`${ph.startTime} <= ${endTimeS * 1000}`,
+						sql`${ph.startTime} >= ${startTimeS}`,
+						sql`${ph.startTime} <= ${endTimeS}`,
 					)
 				},
 				with: {

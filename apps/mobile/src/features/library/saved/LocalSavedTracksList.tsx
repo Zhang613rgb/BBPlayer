@@ -1,47 +1,56 @@
 import dayjs from 'dayjs'
 import { memo, useCallback, useState } from 'react'
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native'
-import { Avatar, Text, useTheme } from 'react-native-paper'
+import { Avatar, Text, TouchableRipple, useTheme } from 'react-native-paper'
 
 import ActivityIndicator from '@/components/common/ActivityIndicator'
 import { DataFetchingError } from '@/features/library/shared/DataFetchingError'
 import useCurrentTrack from '@/hooks/player/useCurrentTrack'
 import { useLocalBilibiliTracks } from '@/hooks/queries/local/useLocalBilibiliTracks'
+import { addToQueue } from '@/utils/player'
 import { resolveBilibiliImageUrl } from '@/utils/imageUrl'
+import type { Track } from '@/types/core/media'
 
 const LocalSavedTrackItem = memo(
 	({
 		item,
+		onPress,
 	}: {
 		item: {
-			track: { id: number; title: string; coverUrl: string | null; createdAt: number }
-			artist: { name: string; avatarUrl: string | null } | null
+			track: Track
+			artist: { name?: string | null; avatarUrl?: string | null } | null
 			addedAt: number
 		}
+		onPress?: () => void
 	}) => {
 		return (
-			<View style={styles.trackItem}>
-				<Avatar.Image
-					size={44}
-					source={{ uri: resolveBilibiliImageUrl(item.track.coverUrl) }}
-				/>
-				<View style={styles.trackInfo}>
-					<Text
-						variant='titleSmall'
-						numberOfLines={1}
-					>
-						{item.track.title}
-					</Text>
-					<Text
-						variant='bodySmall'
-						numberOfLines={1}
-					>
-						{item.artist?.name ?? '未知'}
-						{' · '}
-						{dayjs(item.addedAt).format('MM-DD HH:mm')}
-					</Text>
+			<TouchableRipple
+				onPress={onPress ?? (() => {})}
+				style={styles.trackItemWrapper}
+			>
+				<View style={styles.trackItem}>
+					<Avatar.Image
+						size={44}
+						source={{ uri: resolveBilibiliImageUrl(item.track.coverUrl) }}
+					/>
+					<View style={styles.trackInfo}>
+						<Text
+							variant='titleSmall'
+							numberOfLines={1}
+						>
+							{item.track.title}
+						</Text>
+						<Text
+							variant='bodySmall'
+							numberOfLines={1}
+						>
+							{item.artist?.name ?? '未知'}
+							{' · '}
+							{dayjs(item.addedAt).format('MM-DD HH:mm')}
+						</Text>
+					</View>
 				</View>
-			</View>
+			</TouchableRipple>
 		)
 	},
 )
@@ -58,6 +67,16 @@ const LocalSavedTracksListComponent = memo(() => {
 		refetch,
 	} = useLocalBilibiliTracks()
 
+	const playTrack = useCallback(async (track: Track) => {
+		await addToQueue({
+			tracks: [track],
+			playNow: true,
+			clearQueue: false,
+			playNext: false,
+			startFromKey: track.uniqueKey,
+		})
+	}, [])
+
 	const onRefresh = async () => {
 		setRefreshing(true)
 		await refetch()
@@ -69,12 +88,17 @@ const LocalSavedTracksListComponent = memo(() => {
 			item,
 		}: {
 			item: {
-				track: { id: number; title: string; coverUrl: string | null; createdAt: number }
-				artist: { name: string; avatarUrl: string | null } | null
+				track: Track
+				artist: { name?: string | null; avatarUrl?: string | null } | null
 				addedAt: number
 			}
-		}) => <LocalSavedTrackItem item={item} />,
-		[],
+		}) => (
+			<LocalSavedTrackItem
+				item={item}
+				onPress={() => playTrack(item.track)}
+			/>
+		),
+		[playTrack],
 	)
 
 	if (isPending) {
@@ -138,7 +162,12 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 16,
 		paddingTop: 8,
 	},
+	trackItemWrapper: {
+		flex: 1,
+		flexDirection: 'row',
+	},
 	trackItem: {
+		flex: 1,
 		flexDirection: 'row',
 		alignItems: 'center',
 		paddingVertical: 8,
