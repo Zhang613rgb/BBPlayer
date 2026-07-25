@@ -6,6 +6,7 @@ import log from '@/utils/log'
 import { storage } from '@/utils/mmkv'
 
 import { bilibiliApiClient } from './client'
+import { getDmImgParams } from './dmImg'
 
 const logger = log.extend('3Party.Bilibili.Wbi')
 
@@ -126,5 +127,9 @@ export default function getWbiEncodedParams(
 	params: Record<string, string | number | object>,
 ) {
 	const result = getWbiKeys()
-	return result.map(({ img_key, sub_key }) => encWbi(params, img_key, sub_key))
+	return result.map(({ img_key, sub_key }) => {
+		// 全局注入反爬参数并参与 WBI 签名（修复 412 命门之二）
+		const signedParams = { ...params, ...getDmImgParams() }
+		return encWbi(signedParams, img_key, sub_key)
+	})
 }

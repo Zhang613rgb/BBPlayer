@@ -4,6 +4,7 @@ import useAppStore, { serializeCookieObject } from '@/hooks/stores/useAppStore'
 import { BilibiliApiError } from '@/lib/errors/thirdparty/bilibili'
 
 import { getCsrfToken } from './utils'
+import { getAnonymousCookie } from './buvid'
 
 export interface ReqResponse<T> {
 	code: number
@@ -45,9 +46,14 @@ class ApiClient {
 		skipCookie?: boolean
 	}): ResultAsync<T, BilibiliApiError> => {
 		const url = fullUrl ?? `${this.baseUrl}${endpoint}`
+		// 登录态用登录 cookie；未登录时改发匿名 buvid cookie（修复 412 命门之一）
 		const cookieList = useAppStore.getState().bilibiliCookie
 		const cookie =
-			cookieList && !skipCookie ? serializeCookieObject(cookieList) : ''
+			cookieList && !skipCookie
+				? serializeCookieObject(cookieList)
+				: !skipCookie
+					? getAnonymousCookie()
+					: ''
 
 		const defaultHeaders = {
 			Cookie: cookie,
@@ -183,9 +189,14 @@ class ApiClient {
 			url = `${endpoint}?${searchParams.toString()}`
 		}
 		const requestUrl = fullUrl ?? `${this.baseUrl}${url}`
+		// 登录态用登录 cookie；未登录时改发匿名 buvid cookie（修复 412 命门之一）
 		const cookieList = useAppStore.getState().bilibiliCookie
 		const cookie =
-			cookieList && !skipCookie ? serializeCookieObject(cookieList) : ''
+			cookieList && !skipCookie
+				? serializeCookieObject(cookieList)
+				: !skipCookie
+					? getAnonymousCookie()
+					: ''
 
 		const requestHeaders = {
 			Cookie: cookie,

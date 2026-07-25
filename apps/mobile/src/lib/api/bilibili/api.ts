@@ -413,6 +413,9 @@ export class BilibiliApi {
 			fourk: '1',
 			qlt: String(audioQuality),
 			voice_balance: '1',
+			web_location: '1315873',
+			// 免登录「试看/预览流」解锁（匿名取流关键），高码率/付费内容仍需登录
+			try_look: '1',
 		})
 
 		return wbiParams
@@ -848,6 +851,10 @@ export class BilibiliApi {
 	/**
 	 * 查询用户投稿视频明细
 	 * 可通过 keyword 搜索用户发布的视频
+	 *
+	 * 抗 412 兜底：WEB 模式（/x/space/wbi/arc/search）遇风控码最多重试 2 次
+	 * （每次重试会重新生成 WBI 签名与 dm_img 参数，等价于轮换设备），
+	 * 仍失败则降级到 SEARCH 模式（/x/series/recArchivesByKeywords）。
 	 */
 	getUserUploadedVideos({
 		mid,
@@ -860,19 +867,7 @@ export class BilibiliApi {
 		keyword?: string
 		signal?: AbortSignal
 	}): ResultAsync<BilibiliUserUploadedVideosResponse, BilibiliApiError> {
-		const params = getWbiEncodedParams({
-			mid: mid.toString(),
-			pn: pn.toString(),
-			keyword: keyword ?? '',
-			ps: '30',
-		})
-		return params.andThen((params) => {
-			return bilibiliApiClient.get<BilibiliUserUploadedVideosResponse>({
-				endpoint: '/x/space/wbi/arc/search',
-				params,
-				signal,
-			})
-		})
+		return fetchUserUploadedVideosWithRetry({ mid, pn, keyword, signal })
 	}
 
 	/**
@@ -1572,6 +1567,148 @@ export class BilibiliApi {
 			signal,
 		})
 	}
+}
+
+// ---------------------------------------------------------------------------
+// 投稿列表抗 412 兜底（模块级辅助函数，保持各函数 < 50 行）
+// ---------------------------------------------------------------------------
+
+/** /x/series/recArchivesByKeywords 的原始返回结构（仅取我们需要的字段） */
+interface RecArchivesByKeywordsArchive {
+	aid: number
+	bvid: string
+	title: string
+	cover: string
+	duration: number
+	author: string
+	pubdate?: number
+	created?: number
+}
+
+interface RecArchivesByKeywordsResponse {
+	page?: { count?: number; pn?: number; ps?: number }
+	archives?: RecArchivesByKeywordsArchive[]
+}
+
+/** 判断是否为风控拦截码（-412 / -352 / 412 风控 HTML 页） */
+function isRiskControlCode(code: number | undefined): boolean {
+	return code === -412 || code === -352 || code === 412
+}
+
+/** 秒数转 MM:SS（投稿列表 vlist.length 字段格式） */
+function formatDuration(totalSeconds: number): string {
+	const seconds = Math.max(0, Math.floor(totalSeconds))
+	const mm = Math.floor(seconds / 60)
+	const ss = seconds % 60
+	return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
+}
+
+/** 将 SEARCH 端点返回 remap 成投稿列表统一结构，保证 UI 无需改动 */
+function remapRecArchivesToUploadedVideos(
+	raw: RecArchivesByKeywordsResponse,
+	pn: number,
+	ps: number,
+): BilibiliUserUploadedVideosResponse {
+	const archives = raw.archives ?? []
+	const vlist = archives.map((archive) => ({
+		aid: archive.aid,
+		bvid: archive.bvid,
+		title: archive.title,
+		pic: archive.cover,
+		created: archive.pubdate ?? archive.created ?? 0,
+		length: formatDuration(archive.duration),
+		author: archive.author,
+	}))
+	const count = raw.page?.count ?? archives.length
+	return {
+		page: { pn, ps, count },
+		list: { vlist },
+	}
+}
+
+/** WEB 模式：/x/space/wbi/arc/search（带 WBI 签名与 dm_img 注入） */
+function fetchUserUploadedVideosWeb(
+	mid: number,
+	pn: number,
+	keyword: string | undefined,
+	signal: AbortSignal | undefined,
+): ResultAsync<BilibiliUserUploadedVideosResponse, BilibiliApiError> {
+	const params = {
+		mid: mid.toString(),
+		pn: pn.toString(),
+		keyword: keyword ?? '',
+		ps: '30',
+	}
+	return getWbiEncodedParams(params).andThen((encoded) =>
+		bilibiliApiClient.get<BilibiliUserUploadedVideosResponse>({
+			endpoint: '/x/space/wbi/arc/search',
+			params: encoded,
+			signal,
+		}),
+	)
+}
+
+/** SEARCH 降级模式：/x/series/recArchivesByKeywords */
+function fetchUserUploadedVideosSearch(
+	mid: number,
+	pn: number,
+	keyword: string | undefined,
+	signal: AbortSignal | undefined,
+): ResultAsync<BilibiliUserUploadedVideosResponse, BilibiliApiError> {
+	logger.warning('投稿列表 WEB 模式失败，降级到 recArchivesByKeywords')
+	const fallbackParams = {
+		mid: mid.toString(),
+		keyword: keyword ?? '',
+		pn: pn.toString(),
+		order: 'pubdate',
+		platform: 'web',
+		web_location: '333.1387',
+	}
+	return getWbiEncodedParams(fallbackParams)
+		.andThen((encoded) =>
+			bilibiliApiClient.get<RecArchivesByKeywordsResponse>({
+				endpoint: '/x/series/recArchivesByKeywords',
+				params: encoded,
+				signal,
+			}),
+		)
+		.andThen((raw) => okAsync(remapRecArchivesToUploadedVideos(raw, pn, 30)))
+}
+
+/** WEB 模式最多重试 2 次，耗尽后降级到 SEARCH 模式 */
+function fetchUserUploadedVideosWithRetry({
+	mid,
+	pn,
+	keyword,
+	signal,
+}: {
+	mid: number
+	pn: number
+	keyword?: string
+	signal?: AbortSignal
+}): ResultAsync<BilibiliUserUploadedVideosResponse, BilibiliApiError> {
+	const MAX_RETRY = 2
+	const attempt = (
+		tried: number,
+	): ResultAsync<BilibiliUserUploadedVideosResponse, BilibiliApiError> => {
+		return fetchUserUploadedVideosWeb(mid, pn, keyword, signal).orElse(
+			(error) => {
+				const risk = isRiskControlCode(error.data.msgCode)
+				if (risk && tried < MAX_RETRY) {
+					logger.warning(
+						`投稿列表遇风控 code=${error.data.msgCode}，第 ${tried + 1} 次重试`,
+						{ message: error.message },
+					)
+					return attempt(tried + 1)
+				}
+				if (tried >= MAX_RETRY && risk) {
+					return fetchUserUploadedVideosSearch(mid, pn, keyword, signal)
+				}
+				return errAsync(error)
+			},
+		)
+	}
+	return attempt(0)
 }
 
 export const bilibiliApi = new BilibiliApi()
