@@ -17,7 +17,7 @@ import {
 	View,
 } from 'react-native'
 import PagerView from 'react-native-pager-view'
-import { useTheme } from 'react-native-paper'
+import { Icon as PaperIcon, Text, useTheme } from 'react-native-paper'
 import {
 	createAnimatedComponent,
 	Easing,
@@ -321,7 +321,23 @@ export default function PlayerPage() {
 								/>
 							</View>
 						</AnimatedPagerView>
-					</View>
+					{!currentTrack && (
+						<View style={styles.playerEmptyState} pointerEvents='none'>
+							<PaperIcon
+								source='music-off'
+								size={48}
+								color={colors.onSurfaceVariant}
+							/>
+							<Text variant='titleMedium'>暂无正在播放的音频</Text>
+							<Text
+								variant='bodyMedium'
+								style={{ color: colors.onSurfaceVariant }}
+							>
+								选一首歌开始播放吧
+							</Text>
+						</View>
+					)}
+				</View>
 
 					<PlayerFunctionalMenu
 						menuVisible={menuVisible}
@@ -345,5 +361,16 @@ const styles = StyleSheet.create({
 	},
 	tabView: {
 		flex: 1,
+	},
+	playerEmptyState: {
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		justifyContent: 'center',
+		alignItems: 'center',
+		gap: 8,
+		paddingTop: 80,
 	},
 })

@@ -1,14 +1,14 @@
 import { useRouter } from 'expo-router'
 import { memo, useCallback, useState } from 'react'
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native'
-import { Avatar, Text, TouchableRipple, useTheme } from 'react-native-paper'
+import { Icon as PaperIcon, Text, TouchableRipple, useTheme } from 'react-native-paper'
 
 import ActivityIndicator from '@/components/common/ActivityIndicator'
 import { DataFetchingError } from '@/features/library/shared/DataFetchingError'
+import CoverWithPlaceHolder from '@/components/common/CoverWithPlaceHolder'
 import useCurrentTrack from '@/hooks/player/useCurrentTrack'
 import { useSubscribedArtists } from '@/hooks/queries/local/useSubscriptions'
 import type { BilibiliUserInfo } from '@/types/apis/bilibili'
-import { resolveBilibiliImageUrl } from '@/utils/imageUrl'
 
 const SubscribedArtistListItem = memo(
 	({
@@ -31,9 +31,12 @@ const SubscribedArtistListItem = memo(
 		return (
 			<TouchableRipple onPress={handlePress} style={styles.artistItem}>
 				<View style={styles.artistRow}>
-					<Avatar.Image
+					<CoverWithPlaceHolder
+						id={item.id}
+						title={item.name}
+						cover={item.avatarUrl}
 						size={48}
-						source={{ uri: resolveBilibiliImageUrl(item.avatarUrl) }}
+						borderRadius={24}
 					/>
 					<View style={styles.artistInfo}>
 						<Text
@@ -136,6 +139,11 @@ const SubscribedArtistListComponent = memo(() => {
 				}
 				ListEmptyComponent={
 					<View style={styles.emptyContainer}>
+						<PaperIcon
+							source='account-music'
+							size={48}
+							color={colors.onSurfaceVariant}
+						/>
 						<Text
 							variant='titleMedium'
 							style={styles.emptyText}

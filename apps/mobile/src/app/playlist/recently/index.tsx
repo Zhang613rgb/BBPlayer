@@ -41,7 +41,8 @@ export default function RecentlyPlayedPage() {
 		[selectMode, selected, toggle, enterSelectMode],
 	)
 
-	const { data: tracksData, isPending, isError } = useMostPlayedTracks(14, 10)
+	const { data: tracksData, isPending, isError, refetch } =
+		useMostPlayedTracks(14, 10)
 
 	const tracks = useMemo(() => {
 		if (!tracksData) return []
@@ -95,7 +96,12 @@ export default function RecentlyPlayedPage() {
 	}
 
 	if (isError) {
-		return <PlaylistError text='加载失败' />
+		return (
+			<PlaylistError
+				text='内容没加载出来，检查一下网络？'
+				onRetry={refetch}
+			/>
+		)
 	}
 
 	const isEmpty = !tracksData || tracksData.length === 0

@@ -107,7 +107,12 @@ export default function SearchResultsPage() {
 	}, [searchData])
 
 	if (isErrorSearchData) {
-		return <PlaylistError text='加载失败' />
+		return (
+			<PlaylistError
+				text='内容没加载出来，检查一下网络？'
+				onRetry={refetch}
+			/>
+		)
 	}
 
 	return (

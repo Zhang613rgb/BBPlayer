@@ -1,0 +1,61 @@
+classDiagram
+    %% 既有组件（本次不改动定义，仅改调用点）
+    class PlaylistError {
+        +text: string = '加载失败'
+        +onRetry: () => void
+        +render() JSX.Element
+    }
+    class DataFetchingError {
+        +text: string = '加载失败'
+        +onRetry: () => void
+        +render() JSX.Element
+    }
+    class CoverWithPlaceHolder {
+        +id: string | number
+        +title: string
+        +cover: string | null | ImageRef
+        +size: number
+        +borderRadius: number
+        +style: ViewStyle
+        +cachePolicy: string
+        +render() JSX.Element
+    }
+
+    %% 调用方（页面）与组件关系
+    class RemotePlaylistPage {
+        +refetch: () => void
+        +isError: boolean
+    }
+    class RecentlyPage {
+        +refetch: () => void
+        +isError: boolean
+    }
+    class LocalPlaylistPage {
+        +refetchContents: () => void
+        +refetchMetadata: () => void
+        +isPlaylistDataError: boolean
+        +isPlaylistMetadataError: boolean
+    }
+    class LocalPlaylistList {
+        +ListEmptyComponent: JSX.Element
+    }
+    class SubscribedArtistList {
+        +avatar: JSX.Element
+    }
+    class PlayerPage {
+        +currentTrack: Track
+        +coverRef: SkiaImage
+    }
+    class UploaderPage {
+        +coverRef: SkiaImage
+        +ListEmptyComponent: JSX.Element
+    }
+
+    RemotePlaylistPage ..> PlaylistError : onRetry=refetch (P0 T1)
+    RecentlyPage ..> PlaylistError : onRetry=refetch (P0 T1, 修正1)
+    LocalPlaylistPage ..> PlaylistError : onRetry=组合handler (P1-4 T3, 修正2)
+    LocalPlaylistList ..> PlaylistError : 空态文案 (P1-2 T2)
+    SubscribedArtistList ..> CoverWithPlaceHolder : 头像替换 (P2-3 T6)
+    PlayerPage ..> CoverWithPlaceHolder : 叠加渐变占位(非替换) (P2-3 T6)
+    UploaderPage ..> CoverWithPlaceHolder : 叠加渐变占位(非替换) (P2-3 T6)
+    UploaderPage ..> PlaylistError : onRetry=refetch (P0 T1)

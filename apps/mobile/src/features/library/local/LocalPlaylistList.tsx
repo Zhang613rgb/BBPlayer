@@ -2,7 +2,7 @@ import { Icon } from '@expo/ui'
 import { LegendList } from '@legendapp/list/react-native'
 import { memo, useCallback, useDeferredValue, useMemo, useState } from 'react'
 import { RefreshControl, StyleSheet, View } from 'react-native'
-import { Searchbar, Text, useTheme } from 'react-native-paper'
+import { Icon as PaperIcon, Searchbar, Text, useTheme } from 'react-native-paper'
 
 import FunctionalMenu from '@/components/common/FunctionalMenu'
 import IconButton from '@/components/common/IconButton'
@@ -230,9 +230,27 @@ const LocalPlaylistListComponent = memo(() => {
 							•
 						</Text>
 					}
-					ListEmptyComponent={
-						<Text style={styles.emptyList}>没有播放列表</Text>
-					}
+				ListEmptyComponent={
+					<View style={styles.emptyContainer}>
+						<PaperIcon
+							source='inbox'
+							size={48}
+							color={colors.onSurfaceVariant}
+						/>
+						<Text
+							variant='titleMedium'
+							style={styles.emptyText}
+						>
+							还没有播放列表
+						</Text>
+						<Text
+							variant='bodyMedium'
+							style={{ color: colors.onSurfaceVariant }}
+						>
+							新建一个，把喜欢的音频收进来
+						</Text>
+					</View>
+				}
 				/>
 			</View>
 		</View>
@@ -272,7 +290,14 @@ const styles = StyleSheet.create({
 		textAlign: 'center',
 		paddingTop: 10,
 	},
-	emptyList: {
+	emptyContainer: {
+		flex: 1,
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingTop: 80,
+		gap: 8,
+	},
+	emptyText: {
 		textAlign: 'center',
 	},
 })

@@ -186,6 +186,7 @@ export default function LocalPlaylistPage() {
 		fetchNextPage: fetchNextPagePlaylistData,
 		hasNextPage: hasNextPagePlaylistData,
 		isFetchingNextPage: isFetchingNextPagePlaylistData,
+		refetch: refetchContents,
 	} = usePlaylistContentsInfinite(Number(id), 30, 15)
 	const allLoadedTracks =
 		(
@@ -283,6 +284,7 @@ export default function LocalPlaylistPage() {
 		data: playlistMetadata,
 		isPending: isPlaylistMetadataPending,
 		isError: isPlaylistMetadataError,
+		refetch: refetchMetadata,
 	} = usePlaylistMetadata(Number(id))
 
 	const shareMembers = useSharedPlaylistMembers(playlistMetadata?.shareId)
@@ -649,7 +651,15 @@ export default function LocalPlaylistPage() {
 	if (isPlaylistDataPending || isPlaylistMetadataPending)
 		return <PlaylistPageSkeleton />
 	if (isPlaylistDataError || isPlaylistMetadataError)
-		return <PlaylistError text='加载播放列表内容失败' />
+		return (
+			<PlaylistError
+				text='加载播放列表内容失败'
+				onRetry={() => {
+					refetchContents()
+					refetchMetadata()
+				}}
+			/>
+		)
 	if (!playlistMetadata) return <PlaylistError text='未找到播放列表元数据' />
 
 	const playlistActionsMenu = (

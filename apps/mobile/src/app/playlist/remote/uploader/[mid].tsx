@@ -187,7 +187,12 @@ export default function UploaderPage() {
 	}
 
 	if (isUploadedVideosError || isUserInfoError) {
-		return <PlaylistError text='加载失败' />
+		return (
+			<PlaylistError
+				text='内容没加载出来，检查一下网络？'
+				onRetry={refetch}
+			/>
+		)
 	}
 
 	return (
@@ -294,6 +299,41 @@ export default function UploaderPage() {
 							secondaryButtonIconColor={secondaryButtonIconColor}
 						/>
 					}
+					ListEmptyComponent={
+						tracks.length === 0 ? (
+							startSearch ? (
+								<View style={emptyContainer}>
+									<Text
+										variant='titleMedium'
+										style={styles.emptyText}
+									>
+										没有找到相关歌曲
+									</Text>
+									<Text
+										variant='bodyMedium'
+										style={{ color: colors.onSurfaceVariant }}
+									>
+										换个关键词试试
+									</Text>
+								</View>
+							) : (
+								<View style={emptyContainer}>
+									<Text
+										variant='titleMedium'
+										style={styles.emptyText}
+									>
+										这位 UP 主还没有发布音频作品
+									</Text>
+									<Text
+										variant='bodyMedium'
+										style={{ color: colors.onSurfaceVariant }}
+									>
+										换个 UP 主看看吧
+									</Text>
+								</View>
+							)
+						) : undefined
+					}
 					refreshControl={
 						<RefreshControl
 							refreshing={refreshing}
@@ -332,5 +372,15 @@ const styles = StyleSheet.create({
 		bottom: 0,
 		left: 0,
 		right: 0,
+	},
+	emptyContainer: {
+		flex: 1,
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingTop: 80,
+		gap: 8,
+	},
+	emptyText: {
+		textAlign: 'center',
 	},
 })

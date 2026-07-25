@@ -1,0 +1,44 @@
+sequenceDiagram
+    actor User
+    participant Page as 远程列表页<br/>(如 uploader/[mid])
+    participant Query as React Query Hook<br/>(如 useInfiniteGetUserUploadedVideos)
+    participant API as bilibili API<br/>(网络层，本次不改)
+    participant Err as PlaylistError 组件
+    participant Btn as 重试按钮
+    participant Empty as ListEmptyComponent
+
+    Note over Page,Query: 挂载即触发请求（修正1/2: refetch 已解构就绪）
+    Page->>Query: 触发 fetch
+    Query->>API: 请求数据
+
+    alt 请求失败 (isError)
+        API-->>Query: reject / 抛错
+        Query-->>Page: isError = true
+        Page->>Err: 渲染 <PlaylistError<br/>text="内容没加载出来，检查一下网络？"<br/>onRetry={refetch}/>
+        Err->>Btn: 显示「重试」按钮
+        User->>Btn: 点击重试
+        Btn->>Query: onRetry → refetch()
+        Query->>API: 重新请求
+        alt 重试成功
+            API-->>Query: 返回数据
+            Query-->>Page: isError=false, data 就绪
+            Page->>Page: 渲染列表
+        else 仍失败
+            API-->>Query: 仍报错
+            Query-->>Page: isError=true
+            Page->>Err: 再次渲染错误态（保持可重试）
+        end
+    else 请求成功但无数据
+        API-->>Query: 返回空列表
+        Query-->>Page: isError=false, tracks=[]
+        Page->>Empty: 渲染 ListEmptyComponent
+        alt 属 UP 主页 (P2-1, uploader)
+            Note over Empty: "这位 UP 主还没有发布音频作品"<br/>+ 副文引导
+        else 搜索无果 (已有好范式)
+            Note over Empty: "换个关键词试试？"（本次不动）
+        else 本地无播放列表 (P1-2)
+            Note over Empty: "还没有播放列表" + 副文引导
+        end
+    end
+
+    Note over Page,Empty: 封面/头像破图兜底 (P2-3)<br/>普通图→CoverWithPlaceHolder；Skia ref→叠加渐变占位
