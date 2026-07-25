@@ -6,14 +6,8 @@ import { Avatar, Text, useTheme } from 'react-native-paper'
 import ActivityIndicator from '@/components/common/ActivityIndicator'
 import { DataFetchingError } from '@/features/library/shared/DataFetchingError'
 import useCurrentTrack from '@/hooks/player/useCurrentTrack'
-import { usePlayHistoryByDate } from '@/hooks/queries/playHistory'
-import type { Track } from '@/types/core/media'
+import { useAllPlayHistory, type HistoryTrack } from '@/hooks/queries/playHistory'
 import { resolveBilibiliImageUrl } from '@/utils/imageUrl'
-
-interface HistoryTrack extends Track {
-	historyId?: number
-	playedAt?: number
-}
 
 const HistoryTrackItem = memo(
 	({ item }: { item: HistoryTrack }) => {
@@ -39,7 +33,7 @@ const HistoryTrackItem = memo(
 					>
 						{artistName}
 						{item.playedAt
-							? ` · ${dayjs(item.playedAt).format('HH:mm')}`
+							? ` · ${dayjs(item.playedAt).format('MM-DD HH:mm')}`
 							: ''}
 					</Text>
 				</View>
@@ -52,14 +46,13 @@ const PlayHistoryListComponent = memo(() => {
 	const { colors } = useTheme()
 	const haveTrack = useCurrentTrack()
 	const [refreshing, setRefreshing] = useState(false)
-	const today = dayjs().format('YYYY-MM-DD')
 
 	const {
 		data: historyTracks,
 		isPending,
 		isError,
 		refetch,
-	} = usePlayHistoryByDate(today)
+	} = useAllPlayHistory()
 
 	const onRefresh = async () => {
 		setRefreshing(true)
@@ -99,15 +92,13 @@ const PlayHistoryListComponent = memo(() => {
 					variant='titleMedium'
 					style={styles.headerTitle}
 				>
-					今天
+					全部历史
 				</Text>
 			</View>
 			<FlatList
 				data={historyTracks}
 				renderItem={renderItem}
-				keyExtractor={(item, index) =>
-					`${item.uniqueKey}-${item.historyId ?? index}`
-				}
+				keyExtractor={(item) => item.uniqueKey}
 				contentContainerStyle={styles.listContent}
 				refreshControl={
 					<RefreshControl
@@ -122,7 +113,7 @@ const PlayHistoryListComponent = memo(() => {
 							variant='titleMedium'
 							style={styles.emptyText}
 						>
-							今天还没有播放记录
+							还没有播放记录
 						</Text>
 						<Text
 							variant='bodyMedium'
