@@ -1,43 +1,78 @@
 import dayjs from 'dayjs'
 import { memo, useCallback, useState } from 'react'
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native'
+import {
+	FlatList,
+	RefreshControl,
+	StyleSheet,
+	useColorScheme,
+	View,
+} from 'react-native'
+import { Touchable } from 'react-native-gesture-handler'
 import { Avatar, Text, useTheme } from 'react-native-paper'
 
 import ActivityIndicator from '@/components/common/ActivityIndicator'
 import { DataFetchingError } from '@/features/library/shared/DataFetchingError'
 import useCurrentTrack from '@/hooks/player/useCurrentTrack'
+import useIsCurrentTrack from '@/hooks/player/useIsCurrentTrack'
 import { useAllPlayHistory, type HistoryTrack } from '@/hooks/queries/playHistory'
 import { resolveBilibiliImageUrl } from '@/utils/imageUrl'
+import { addToQueue } from '@/utils/player'
 
 const HistoryTrackItem = memo(
 	({ item }: { item: HistoryTrack }) => {
+		const dark = useColorScheme() === 'dark'
+		const isCurrentTrack = useIsCurrentTrack(item.uniqueKey)
 		const coverUrl =
 			item.coverUrl ?? item.artist?.avatarUrl ?? null
 		const artistName = item.artist?.name ?? '未知'
 		return (
-			<View style={styles.trackItem}>
-				<Avatar.Image
-					size={44}
-					source={{ uri: resolveBilibiliImageUrl(coverUrl) }}
-				/>
-				<View style={styles.trackInfo}>
-					<Text
-						variant='titleSmall'
-						numberOfLines={1}
-					>
-						{item.title}
-					</Text>
-					<Text
-						variant='bodySmall'
-						numberOfLines={1}
-					>
-						{artistName}
-						{item.playedAt
-							? ` · ${dayjs(item.playedAt).format('MM-DD HH:mm')}`
-							: ''}
-					</Text>
+			<Touchable
+				androidRipple={{}}
+				style={{
+					backgroundColor: isCurrentTrack
+						? dark
+							? 'rgba(255, 255, 255, 0.12)'
+							: 'rgba(0, 0, 0, 0.12)'
+						: 'transparent',
+					paddingVertical: 4,
+					paddingHorizontal: 8,
+					borderRadius: 8,
+				}}
+				onPress={() => {
+					if (isCurrentTrack) return
+					void addToQueue({
+						tracks: [item],
+						clearQueue: false,
+						playNow: true,
+						playNext: false,
+						startFromKey: item.uniqueKey,
+					})
+				}}
+			>
+				<View style={styles.trackItem}>
+					<Avatar.Image
+						size={44}
+						source={{ uri: resolveBilibiliImageUrl(coverUrl) }}
+					/>
+					<View style={styles.trackInfo}>
+						<Text
+							variant='titleSmall'
+							numberOfLines={1}
+						>
+							{item.title}
+						</Text>
+						<Text
+							variant='bodySmall'
+							numberOfLines={1}
+						>
+							{artistName}
+							{item.playedAt
+								? ` · ${dayjs(item.playedAt).format('MM-DD HH:mm')}`
+								: ''}
+						</Text>
+					</View>
 				</View>
-			</View>
+			</Touchable>
 		)
 	},
 )
