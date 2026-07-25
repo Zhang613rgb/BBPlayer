@@ -19,6 +19,11 @@ import log, { flatErrorMessage } from './log'
 
 const logger = log.extend('Utils.Player')
 
+/** 低于此秒数且不足总时长 10% 的收听视为误触/秒切，不计入历史。 */
+const MIN_VALID_PLAYED_SEC = 3
+/** 实际播放时长 / 总时长 达到该比例即算有效收听（completed=1）。 */
+const COMPLETED_RATIO = 0.5
+
 /**
  * 将内部 Track 类型转换为 Orpheus 的 Track 类型。
  * @param track - 内部 Track 对象。
@@ -262,14 +267,27 @@ async function finalizeAndRecordCurrentTrack(
 		const playedSeconds = Math.max(0, Math.floor(position))
 		const duration = Math.max(1, Math.floor(realDuration))
 		const effectivePlayed = Math.min(playedSeconds, duration)
-		const threshold = Math.max(Math.floor(duration * 0.9), duration - 2)
-		const completed = effectivePlayed >= threshold
+
+		// 有效收听阈值：纯 0 或极短（不足 3 秒且不足总时长 10%）视为误触/秒切，丢弃不产生垃圾记录。
+		const validListening =
+			effectivePlayed > MIN_VALID_PLAYED_SEC ||
+			effectivePlayed > duration * 0.1
+		if (!validListening) {
+			logger.debug('播放时长过短，跳过历史记录', {
+				uniqueKey,
+				effectivePlayed,
+			})
+			return
+		}
+
+		// 完成态：听满半首即算有效收听（自然结束时 effectivePlayed≈duration 自会命中）。
+		const completed = effectivePlayed / duration >= COMPLETED_RATIO
+
 		logger.info('完成播放', { uniqueKey })
 		logger.debug('完成播放标记', {
 			playedSeconds,
 			duration,
 			effectivePlayed,
-			threshold,
 			completed,
 			uniqueKey,
 		})
@@ -285,7 +303,8 @@ async function finalizeAndRecordCurrentTrack(
 			}
 		}
 
-		const res = await trackService.addPlayRecordFromUniqueKey(uniqueKey, {
+		// 写入/合并播放历史（同一收听会话只保留一条，completed 具备真实含义）。
+		const res = await trackService.recordOrMergePlayHistory(uniqueKey, {
 			startTime: (Date.now() - playedSeconds * 1000) / 1000,
 			durationPlayed: effectivePlayed,
 			completed,

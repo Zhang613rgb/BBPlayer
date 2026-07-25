@@ -15,6 +15,7 @@ import {
 } from '@/hooks/queries/db/playlist'
 import useAppStore from '@/hooks/stores/useAppStore'
 import { useModalStore } from '@/hooks/stores/useModalStore'
+import { FAVORITE_PLAYLIST_TITLE } from '@/hooks/player/useLocalFavorite'
 import type { Playlist } from '@/types/core/media'
 
 import LocalPlaylistItem from './LocalPlaylistItem'
@@ -45,6 +46,25 @@ const renderPlaylistItem = ({
 	item: Playlist & { isToView?: boolean }
 }) => <LocalPlaylistItem item={item} />
 
+/**
+ * 判断一个歌单是否为系统托管的「我的收藏」歌单。
+ * 它在 DB 中是一张 `type:'local'` 的普通歌单（标题见 FAVORITE_PLAYLIST_TITLE），
+ * 不应出现在「播放列表」列表中（收藏有独立的展示入口）。
+ */
+function isFavoritePlaylist(
+	playlist: Playlist | (Playlist & { isToView?: boolean }),
+): boolean {
+	return playlist.type === 'local' && playlist.title === FAVORITE_PLAYLIST_TITLE
+}
+
+/** 从歌单列表中剔除「我的收藏」歌单。 */
+function excludeFavoritePlaylist<T extends Playlist | (Playlist & { isToView?: boolean })>(
+	playlists: T[] | undefined,
+): T[] {
+	if (!playlists) return []
+	return playlists.filter((playlist) => !isFavoritePlaylist(playlist))
+}
+
 const LocalPlaylistListComponent = memo(() => {
 	const { colors } = useTheme()
 	const haveTrack = useCurrentTrack()
@@ -67,12 +87,13 @@ const LocalPlaylistListComponent = memo(() => {
 
 	const finalPlaylists = useMemo(() => {
 		if (deferredSearchQuery.trim()) {
-			return searchResults ?? []
+			// 搜索结果同样剔除「我的收藏」歌单
+			return excludeFavoritePlaylist(searchResults)
 		}
 
 		if (!playlists) return []
 
-		if (!hasBilibiliCookie()) return playlists
+		if (!hasBilibiliCookie()) return excludeFavoritePlaylist(playlists)
 		return [
 			{
 				id: 1145141919810,
@@ -88,7 +109,7 @@ const LocalPlaylistListComponent = memo(() => {
 				updatedAt: new Date(),
 				isToView: true,
 			},
-			...playlists,
+			...excludeFavoritePlaylist(playlists),
 		] as (Playlist & { isToView?: boolean })[]
 	}, [hasBilibiliCookie, playlists, deferredSearchQuery, searchResults])
 
@@ -124,7 +145,7 @@ const LocalPlaylistListComponent = memo(() => {
 				</Text>
 				<View style={styles.headerActionsContainer}>
 					<Text variant='bodyMedium'>
-						{playlists.length ?? 0}&thinsp;个播放列表
+						{excludeFavoritePlaylist(playlists).length ?? 0}&thinsp;个播放列表
 					</Text>
 					<FunctionalMenu
 						visible={menuVisible}

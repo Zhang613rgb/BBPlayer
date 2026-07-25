@@ -9,15 +9,25 @@ import useCurrentTrack from '@/hooks/player/useCurrentTrack'
 import type { CreateTrackPayload } from '@/types/services/track'
 import type { Track } from '@/types/core/media'
 
-const FAV_TITLE = '我的收藏'
+/**
+ * 「我的收藏」歌单在 DB 中以一张 `type:'local'` 的普通歌单实现。
+ * 为避免魔法字符串散落，这里统一导出其标题，供「播放列表」展示层过滤复用。
+ */
+export const FAVORITE_PLAYLIST_TITLE = '我的收藏'
 
 async function getOrCreateFavPlaylistId(): Promise<number> {
 	const existing = await drizzleDb.query.playlists.findFirst({
-		where: and(eq(playlists.title, FAV_TITLE), eq(playlists.type, 'local')),
+		where: and(
+			eq(playlists.title, FAVORITE_PLAYLIST_TITLE),
+			eq(playlists.type, 'local'),
+		),
 		columns: { id: true },
 	})
 	if (existing) return existing.id
-	const created = await playlistService.createPlaylist({ title: FAV_TITLE, type: 'local' })
+	const created = await playlistService.createPlaylist({
+		title: FAVORITE_PLAYLIST_TITLE,
+		type: 'local',
+	})
 	if (created.isErr()) throw created.error
 	return created.value.id
 }

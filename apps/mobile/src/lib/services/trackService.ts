@@ -32,6 +32,13 @@ import log from '@/utils/log'
 import generateUniqueTrackKey from './genKey'
 
 const logger = log.extend('Service.Track')
+
+/**
+ * 历史记录合并窗口（秒）。
+ * 同一首歌在窗口内再次触发收听结束事件（切歌/自动进阶/替换队列项等导致的重复触发），
+ * 视为同一次收听会话，只更新已有记录而非新增，避免产生零碎重复历史。
+ */
+const HISTORY_MERGE_WINDOW_SEC = 60
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type DBLike = ExpoSQLiteDatabase<typeof schema> | Tx
 type SelectTrackBase = typeof schema.tracks.$inferSelect
@@ -337,6 +344,140 @@ export class TrackService {
 				e instanceof ServiceError
 					? e
 					: new DatabaseError(`增加播放记录失败：${uniqueKey}`, {
+							cause: e,
+						}),
+		)
+	}
+
+	/**
+	 * 获取某 track 最近的一条播放记录（按自增 id 降序，即最后写入的那条）。
+	 * @param trackId - track 的数据库 ID。
+	 * @returns ResultAsync 包含最近记录或 null（尚无记录）。
+	 */
+	public getLatestPlayRecordByTrackId(
+		trackId: number,
+	): ResultAsync<typeof schema.playHistory.$inferSelect | null, DatabaseError> {
+		return ResultAsync.fromPromise(
+			Sentry.startSpan(
+				{ name: 'db:query:latestPlayRecord', op: 'db' },
+				() =>
+					this.db.query.playHistory.findFirst({
+						where: eq(schema.playHistory.trackId, trackId),
+						orderBy: [desc(schema.playHistory.id)],
+					}),
+			),
+			(e) => new DatabaseError('获取最近播放记录失败', { cause: e }),
+		)
+	}
+
+	/**
+	 * 更新某条播放记录的部分字段。
+	 * @param id - 播放记录 ID。
+	 * @param patch - 需要更新的字段。
+	 * @returns ResultAsync 包含 true 或一个错误。
+	 */
+	public updatePlayRecord(
+		id: number,
+		patch: Partial<{
+			startTime: number
+			durationPlayed: number
+			completed: boolean
+		}>,
+	): ResultAsync<true, DatabaseError> {
+		if (Object.keys(patch).length === 0) {
+			return okAsync(true as const)
+		}
+		const setValues = {
+			...(patch.startTime !== undefined ? { startTime: patch.startTime } : {}),
+			...(patch.durationPlayed !== undefined
+				? { durationPlayed: patch.durationPlayed }
+				: {}),
+			...(patch.completed !== undefined ? { completed: patch.completed } : {}),
+		}
+
+		return ResultAsync.fromPromise(
+			Sentry.startSpan(
+				{ name: 'db:update:playHistory', op: 'db' },
+				() =>
+					this.db
+						.update(schema.playHistory)
+						.set(setValues)
+						.where(eq(schema.playHistory.id, id)),
+			),
+			(e) => new DatabaseError('更新播放记录失败', { cause: e }),
+		).andThen(() => okAsync(true as const))
+	}
+
+	/**
+	 * 写入播放记录，并在窗口内合并同一次收听会话，避免重复/零碎记录。
+	 *
+	 * 逻辑：
+	 * 1. 解析 uniqueKey 得到 trackId（找不到则报错）。
+	 * 2. 查该 track 最近一条记录，若其近似结束时间（startTime + durationPlayed）
+	 *    距现在不超过 {@link HISTORY_MERGE_WINDOW_SEC}，视为同一次收听会话 → 更新该条
+	 *    （startTime 取更早者、durationPlayed 取较大者、completed 取二者并集）。
+	 * 3. 否则插入一条新记录。
+	 *
+	 * @param uniqueKey - track 的唯一键。
+	 * @param record - 本次收听的播放记录（调用方已做好有效收听/完成态判定）。
+	 * @returns ResultAsync 包含 true 或一个错误。
+	 */
+	public recordOrMergePlayHistory(
+		uniqueKey: string,
+		record: PlayRecord,
+	): ResultAsync<true, ServiceError | DatabaseError> {
+		return ResultAsync.fromPromise(
+			(async () => {
+				const trackIds = await this.findTrackIdsByUniqueKeys([uniqueKey])
+				if (trackIds.isErr()) throw trackIds.error
+				const trackId = trackIds.value.get(uniqueKey)
+				if (!trackId) throw createTrackNotFound(uniqueKey)
+
+				const latestResult = await this.getLatestPlayRecordByTrackId(trackId)
+				if (latestResult.isErr()) throw latestResult.error
+				const latest = latestResult.value
+
+				const nowSec = Math.floor(Date.now() / 1000)
+				const latestEndApprox = latest
+					? latest.startTime + latest.durationPlayed
+					: Number.NEGATIVE_INFINITY
+
+				// 满足任一条件即视为同一次收听会话：
+				// (a) 距上次记录的近似结束时间在窗口内（吸收「切歌/秒切」产生的连续触发，也兼容旧数据里 0 时长误记）；
+				// (b) 本次会话起点与上次记录的起点在窗口内（吸收同一长曲目内被反复触发、且间隔超过窗口的「完成」事件）。
+			const withinEndWindow = nowSec - latestEndApprox <= HISTORY_MERGE_WINDOW_SEC
+			// latest 可能为 null（该 track 尚无播放记录），必须做空值守卫，
+			// 否则首次播放时解引用 latest.startTime 会抛 TypeError 导致永远写不进历史。
+			const withinStartWindow = latest
+				? Math.abs(record.startTime - latest.startTime) <=
+					HISTORY_MERGE_WINDOW_SEC
+				: false
+
+			if (latest && (withinEndWindow || withinStartWindow)) {
+					// 同一次收听会话：合并而非新增
+					const updateResult = await this.updatePlayRecord(latest.id, {
+						startTime: Math.min(latest.startTime, record.startTime),
+						durationPlayed: Math.max(
+							latest.durationPlayed,
+							record.durationPlayed,
+						),
+						completed: latest.completed || record.completed,
+					})
+					if (updateResult.isErr()) throw updateResult.error
+				} else {
+					const insertResult = await this.addPlayRecordFromTrackId(
+						trackId,
+						record,
+					)
+					if (insertResult.isErr()) throw insertResult.error
+				}
+
+				return true as const
+			})(),
+			(e) =>
+				e instanceof ServiceError
+					? e
+					: new DatabaseError(`记录或合并播放历史失败：${uniqueKey}`, {
 							cause: e,
 						}),
 		)
