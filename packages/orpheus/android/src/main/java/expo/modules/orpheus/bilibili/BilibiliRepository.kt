@@ -128,8 +128,8 @@ object BilibiliRepository {
         if (targetAudio != null) {
             return targetAudio.baseUrl to volume
         } else {
-            val highestQualityAudio = dash.audio[0]
-            return highestQualityAudio.baseUrl to volume
+            val lowestQualityAudio = dash.audio.minByOrNull { it.bandwidth } ?: dash.audio[0]
+            return lowestQualityAudio.baseUrl to volume
         }
     }
 

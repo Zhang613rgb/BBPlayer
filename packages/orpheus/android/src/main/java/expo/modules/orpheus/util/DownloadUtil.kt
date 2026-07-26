@@ -132,7 +132,7 @@ object DownloadUtil {
                 try {
                     val bvid = uri.getQueryParameter("bvid")
                     val cid = uri.getQueryParameter("cid")?.toLongOrNull()
-                    val quality = uri.getQueryParameter("quality")?.toIntOrNull() ?: 30280
+                    val quality = uri.getQueryParameter("quality")?.toIntOrNull() ?: 30216
                     val (realUrl, volume) = BilibiliRepository.resolveAudioUrl(
                         bvid = bvid!!,
                         cid = cid,
