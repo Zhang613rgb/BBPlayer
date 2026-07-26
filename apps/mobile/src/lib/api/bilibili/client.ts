@@ -28,6 +28,20 @@ const toRequestError = (error: unknown) => {
 	})
 }
 
+/**
+ * 按 endpoint host 推导 referer/origin（对齐 PiliPlus 未登录风控规避：
+ * space/search 接口须用各自 host 的 referer，写死 www 是高概率 -412 原因之一）。
+ */
+function refererForEndpoint(endpoint: string): { referer: string; origin: string } {
+	if (endpoint.includes('/x/space/')) {
+		return { referer: 'https://space.bilibili.com/', origin: 'https://space.bilibili.com' }
+	}
+	if (endpoint.includes('/x/web-interface/wbi/search/')) {
+		return { referer: 'https://search.bilibili.com/', origin: 'https://search.bilibili.com' }
+	}
+	return { referer: 'https://www.bilibili.com/', origin: 'https://www.bilibili.com' }
+}
+
 class ApiClient {
 	private baseUrl = 'https://api.bilibili.com'
 
@@ -55,12 +69,13 @@ class ApiClient {
 					? getAnonymousCookie()
 					: ''
 
+		const { referer, origin } = refererForEndpoint(endpoint)
 		const defaultHeaders = {
 			Cookie: cookie,
 			'User-Agent':
 				'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 BiliApp/6.66.0',
-			Referer: 'https://www.bilibili.com/',
-			Origin: 'https://www.bilibili.com',
+			Referer: referer,
+			Origin: origin,
 		}
 
 		const headers = new Headers(defaultHeaders)
@@ -198,12 +213,13 @@ class ApiClient {
 					? getAnonymousCookie()
 					: ''
 
+		const { referer, origin } = refererForEndpoint(endpoint)
 		const requestHeaders = {
 			Cookie: cookie,
 			'User-Agent':
 				'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 BiliApp/6.66.0',
-			Referer: 'https://www.bilibili.com/',
-			Origin: 'https://www.bilibili.com',
+			Referer: referer,
+			Origin: origin,
 			...headers,
 		}
 
