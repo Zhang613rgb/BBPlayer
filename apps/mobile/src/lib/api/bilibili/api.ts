@@ -232,14 +232,12 @@ export class BilibiliApi {
 		{ result: BilibiliSearchVideo[]; numPages: number },
 		BilibiliApiError
 	> {
-		const params = getWbiEncodedParams({
-			keyword,
-			search_type: 'video',
-			page: page.toString(),
-		})
-
-		return params
-			.andThen((params) => {
+		return withRiskControlRetry('搜索视频', () =>
+			getWbiEncodedParams({
+				keyword,
+				search_type: 'video',
+				page: page.toString(),
+			}).andThen((params) => {
 				return bilibiliApiClient.get<{
 					result: BilibiliSearchVideo[]
 					numPages: number
@@ -249,13 +247,13 @@ export class BilibiliApi {
 					skipCookie,
 					signal,
 				})
-			})
-			.andThen((res) => {
+			}).andThen((res) => {
 				if (!res.result) {
 					res.result = []
 				}
 				return okAsync(res)
-			})
+			}),
+		)
 	}
 
 	/**
@@ -275,14 +273,12 @@ export class BilibiliApi {
 		{ result: BilibiliSearchUser[]; numPages: number },
 		BilibiliApiError
 	> {
-		const params = getWbiEncodedParams({
-			keyword,
-			search_type: 'bili_user',
-			page: page.toString(),
-		})
-
-		return params
-			.andThen((params) => {
+		return withRiskControlRetry('搜索UP主', () =>
+			getWbiEncodedParams({
+				keyword,
+				search_type: 'bili_user',
+				page: page.toString(),
+			}).andThen((params) => {
 				return bilibiliApiClient.get<{
 					result: BilibiliSearchUser[]
 					numPages: number
@@ -292,13 +288,13 @@ export class BilibiliApi {
 					skipCookie,
 					signal,
 				})
-			})
-			.andThen((res) => {
+			}).andThen((res) => {
 				if (!res.result) {
 					res.result = []
 				}
 				return okAsync(res)
-			})
+			}),
+		)
 	}
 
 	/**
@@ -572,16 +568,17 @@ export class BilibiliApi {
 		mid: number
 		signal?: AbortSignal
 	}): ResultAsync<BilibiliUserInfo, BilibiliApiError> {
-		const params = getWbiEncodedParams({
-			mid: mid.toString(),
-		})
-		return params.andThen((params) => {
-			return bilibiliApiClient.get<BilibiliUserInfo>({
-				endpoint: '/x/space/wbi/acc/info',
-				params,
-				signal,
-			})
-		})
+		return withRiskControlRetry('获取UP资料', () =>
+			getWbiEncodedParams({
+				mid: mid.toString(),
+			}).andThen((params) => {
+				return bilibiliApiClient.get<BilibiliUserInfo>({
+					endpoint: '/x/space/wbi/acc/info',
+					params,
+					signal,
+				})
+			}),
+		)
 	}
 
 	/**
@@ -1593,6 +1590,30 @@ interface RecArchivesByKeywordsResponse {
 /** 判断是否为风控拦截码（-412 / -352 / 412 风控 HTML 页） */
 function isRiskControlCode(code: number | undefined): boolean {
 	return code === -412 || code === -352 || code === 412
+}
+
+/**
+ * 通用风控重试：命中风控码最多重试 maxRetry 次。
+ * 每次重试重新调用 attemptFn（内部会重新 getWbiEncodedParams → 重签 WBI + 重新注入 dm_img，
+ * 等价于轮换设备指纹），以争取通过 B 站匿名风控。
+ */
+function withRiskControlRetry<T>(
+	label: string,
+	attemptFn: () => ResultAsync<T, BilibiliApiError>,
+	maxRetry = 2,
+): ResultAsync<T, BilibiliApiError> {
+	const attempt = (tried: number): ResultAsync<T, BilibiliApiError> =>
+		attemptFn().orElse((error) => {
+			const risk = isRiskControlCode(error.data.msgCode)
+			if (risk && tried < maxRetry) {
+				logger.warning(`${label} 遇风控 code=${error.data.msgCode}，第 ${tried + 1} 次重试`, {
+					message: error.message,
+				})
+				return attempt(tried + 1)
+			}
+			return errAsync(error)
+		})
+	return attempt(0)
 }
 
 /** 秒数转 MM:SS（投稿列表 vlist.length 字段格式） */
